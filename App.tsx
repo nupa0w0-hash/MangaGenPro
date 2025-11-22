@@ -1,0 +1,927 @@
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark } from './types';
+import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
+import CharacterManager from './components/CharacterManager';
+import ComicPanel from './components/ComicPanel';
+import ApiKeySelector from './components/ApiKeySelector';
+import { 
+  BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
+  PenTool, Download, Monitor, Edit3, Trash2, Plus, 
+  Save, FolderOpen, RefreshCcw, Palette, XCircle, FilePlus, ArchiveRestore,
+  Menu, X, MessageSquare, Quote, Eye, Sun, Moon
+} from 'lucide-react';
+
+// Extension of Panel type for layout processing
+type LayoutPanel = Panel & { 
+  gridColSpan: string; 
+  gridRowSpan: string;
+  displaySize: 'square' | 'wide' | 'tall';
+};
+
+const App: React.FC = () => {
+  const [isApiReady, setIsApiReady] = useState(false);
+  
+  // Theme State
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+
+  // Data State
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [storyLog, setStoryLog] = useState('');
+  const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
+  const [coverRatio, setCoverRatio] = useState<'landscape' | 'portrait'>('landscape');
+  const [styleMode, setStyleMode] = useState<StyleMode>('bw');
+  const [pageTemplate, setPageTemplate] = useState<PageTemplate>('dynamic');
+  
+  // Bookmark State
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  
+  // UI State
+  const [isScripting, setIsScripting] = useState(false);
+  const [isRerollingPanel, setIsRerollingPanel] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'input' | 'preview' | 'result'>('input');
+  const [showSidebar, setShowSidebar] = useState(true);
+  
+  // Generation State
+  const [currentPanelIndex, setCurrentPanelIndex] = useState<number>(-1); 
+  const [generatingCover, setGeneratingCover] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  // Initialize Theme
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (systemDark ? 'dark' : 'light');
+    
+    setTheme(initialTheme);
+    if (initialTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Load bookmarks and Autosave on init
+  useEffect(() => {
+    const saved = localStorage.getItem('storyBookmarks');
+    if (saved) {
+        try { setBookmarks(JSON.parse(saved)); } catch(e) { console.error(e); }
+    }
+    const autosave = localStorage.getItem('mangaGen_autosave');
+    if (autosave) {
+        try {
+            const data = JSON.parse(autosave);
+            if (data.storyLog) setStoryLog(data.storyLog);
+            if (data.characters) setCharacters(data.characters);
+            if (data.storyboard) setStoryboard(data.storyboard);
+            if (data.styleMode) setStyleMode(data.styleMode);
+            if (data.coverRatio) setCoverRatio(data.coverRatio);
+            if (data.pageTemplate) setPageTemplate(data.pageTemplate);
+        } catch(e) { console.error("Autosave load failed", e); }
+    }
+  }, []);
+
+  // Auto-save effect
+  useEffect(() => {
+      const saveData = {
+          storyLog,
+          characters,
+          storyboard,
+          styleMode,
+          coverRatio,
+          pageTemplate,
+          timestamp: Date.now()
+      };
+      const timer = setTimeout(() => {
+          localStorage.setItem('mangaGen_autosave', JSON.stringify(saveData));
+      }, 2000); 
+
+      return () => clearTimeout(timer);
+  }, [storyLog, characters, storyboard, styleMode, coverRatio, pageTemplate]);
+
+  const saveBookmark = () => {
+    if (!storyLog.trim()) return;
+    const title = storyLog.slice(0, 20) + (storyLog.length > 20 ? '...' : '');
+    const newBookmark: Bookmark = {
+        id: Date.now(),
+        title,
+        storyLog,
+        characters, 
+        storyboard, 
+        date: new Date().toLocaleDateString(),
+        styleMode,
+        coverRatio,
+        pageTemplate
+    };
+    const updated = [newBookmark, ...bookmarks];
+    setBookmarks(updated);
+    localStorage.setItem('storyBookmarks', JSON.stringify(updated));
+    alert('스토리가 저장되었습니다.');
+  };
+
+  const loadBookmark = (bm: Bookmark) => {
+    if (confirm('현재 작업 중인 내용이 덮어씌워집니다. 불러오시겠습니까?')) {
+        setStoryLog(bm.storyLog);
+        setCharacters(bm.characters || []);
+        setStoryboard(bm.storyboard);
+        if (bm.styleMode) setStyleMode(bm.styleMode);
+        setCoverRatio(bm.coverRatio || 'landscape');
+        setPageTemplate(bm.pageTemplate || 'dynamic');
+        
+        if (bm.storyboard) setActiveTab('preview');
+        else setActiveTab('input');
+    }
+  };
+
+  const deleteBookmark = (id: number, e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!confirm('정말 삭제하시겠습니까?')) return;
+      const updated = bookmarks.filter(b => b.id !== id);
+      setBookmarks(updated);
+      localStorage.setItem('storyBookmarks', JSON.stringify(updated));
+  };
+
+  const loadAutosave = () => {
+      const autosave = localStorage.getItem('mangaGen_autosave');
+      if (autosave && confirm('가장 최근 자동 저장 데이터를 불러오시겠습니까?')) {
+        try {
+            const data = JSON.parse(autosave);
+            if (data.storyLog) setStoryLog(data.storyLog);
+            if (data.characters) setCharacters(data.characters);
+            if (data.storyboard) setStoryboard(data.storyboard);
+            if (data.styleMode) setStyleMode(data.styleMode);
+            if (data.coverRatio) setCoverRatio(data.coverRatio);
+            if (data.pageTemplate) setPageTemplate(data.pageTemplate);
+            
+            if (data.storyboard) setActiveTab('preview');
+            else setActiveTab('input');
+        } catch(e) { console.error(e); }
+      } else if (!autosave) {
+          alert("저장된 데이터가 없습니다.");
+      }
+  };
+
+  const handleApiReady = () => setIsApiReady(true);
+
+  const handleGenerateStoryboard = async () => {
+    if (!storyLog.trim()) return;
+    if (characters.length === 0) {
+      alert("캐릭터를 최소 1명 이상 등록해주세요.");
+      return;
+    }
+
+    setIsScripting(true);
+    try {
+      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode);
+      setStoryboard(result);
+      setActiveTab('preview');
+    } catch (error) {
+      alert("스토리보드 생성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsScripting(false);
+    }
+  };
+
+  // --- Panel Management Functions ---
+  const handleAddPanel = () => {
+      if (!storyboard) return;
+      const newId = storyboard.panels.length > 0 
+        ? Math.max(...storyboard.panels.map(p => p.id)) + 1 
+        : 1;
+
+      const newPanel: Panel = {
+          id: newId,
+          description: "새로운 장면",
+          visualPromptEn: "A detailed description of the new scene.",
+          dialogues: [],
+          charactersInPanel: [],
+          panelSize: 'square',
+          status: 'pending'
+      };
+      
+      setStoryboard({
+          ...storyboard,
+          panels: [...storyboard.panels, newPanel]
+      });
+  };
+
+  const handleDeletePanel = (index: number) => {
+      if (!storyboard) return;
+      if (!confirm("이 컷을 삭제하시겠습니까?")) return;
+      const newPanels = storyboard.panels.filter((_, i) => i !== index);
+      setStoryboard({ ...storyboard, panels: newPanels });
+  };
+
+  const handleToggleCover = () => {
+      if (!storyboard) return;
+      if (storyboard.coverImageUrl || storyboard.coverImagePrompt) {
+           if (!confirm("표지를 삭제하시겠습니까?")) return;
+           setStoryboard({ ...storyboard, coverImagePrompt: '', coverImageUrl: undefined });
+      } else {
+           setStoryboard({ ...storyboard, coverImagePrompt: 'Detailed cover art description based on the story theme...', coverImageUrl: undefined });
+      }
+  };
+
+  const handleRerollPanelScript = async (panelIndex: number) => {
+      if (!storyboard) return;
+      const panel = storyboard.panels[panelIndex];
+      
+      setIsRerollingPanel(panel.id);
+      try {
+          const newPanel = await regeneratePanelScript(panel, storyLog, characters, storyboard.styleMode);
+          const newPanels = [...storyboard.panels];
+          newPanels[panelIndex] = newPanel;
+          setStoryboard({ ...storyboard, panels: newPanels });
+      } catch (e) {
+          alert("패널 재생성에 실패했습니다.");
+      } finally {
+          setIsRerollingPanel(null);
+      }
+  };
+
+  const handleUpdatePanel = (index: number, field: keyof Panel, value: any) => {
+    if (!storyboard) return;
+    const newPanels = [...storyboard.panels];
+    newPanels[index] = { ...newPanels[index], [field]: value };
+    setStoryboard({ ...storyboard, panels: newPanels });
+  };
+  
+  const addDialogue = (panelIndex: number) => {
+      if (!storyboard) return;
+      const panel = storyboard.panels[panelIndex];
+      const newDialogue: Dialogue = { speaker: 'Unknown', text: '', type: 'speech' };
+      handleUpdatePanel(panelIndex, 'dialogues', [...(panel.dialogues || []), newDialogue]);
+  };
+
+  const updateDialogue = (panelIndex: number, dialogueIndex: number, field: keyof Dialogue, value: string) => {
+      if (!storyboard) return;
+      const panel = storyboard.panels[panelIndex];
+      const newDialogues = [...panel.dialogues];
+      newDialogues[dialogueIndex] = { ...newDialogues[dialogueIndex], [field]: value };
+      handleUpdatePanel(panelIndex, 'dialogues', newDialogues);
+  };
+
+  const removeDialogue = (panelIndex: number, dialogueIndex: number) => {
+      if (!storyboard) return;
+      const panel = storyboard.panels[panelIndex];
+      const newDialogues = panel.dialogues.filter((_, i) => i !== dialogueIndex);
+      handleUpdatePanel(panelIndex, 'dialogues', newDialogues);
+  };
+
+  const handleUpdateStoryboard = (field: keyof Storyboard, value: any) => {
+    if (!storyboard) return;
+    setStoryboard({ ...storyboard, [field]: value });
+  };
+
+  const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode) => {
+     setStoryboard(prev => {
+        if (!prev) return null;
+        return {
+            ...prev,
+            panels: prev.panels.map(p => p.id === panel.id ? { ...p, status: 'generating' } : p)
+        };
+     });
+
+     try {
+        const imageUrl = await generatePanelImage(panel, allChars, currentStyle);
+        setStoryboard(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                panels: prev.panels.map(p => p.id === panel.id ? { ...p, status: 'completed', imageUrl } : p)
+            };
+        });
+        return true;
+     } catch (error) {
+        setStoryboard(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                panels: prev.panels.map(p => p.id === panel.id ? { ...p, status: 'failed' } : p)
+            };
+        });
+        return false;
+     }
+  }, []);
+
+  const handleStartDrawing = async () => {
+    if (!storyboard) return;
+    setActiveTab('result');
+    
+    const currentStyle = storyboard.styleMode;
+    if (storyboard.coverImagePrompt && !storyboard.coverImageUrl) {
+      setGeneratingCover(true);
+      try {
+        const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, currentStyle);
+        setStoryboard(prev => prev ? { ...prev, coverImageUrl: coverUrl } : null);
+      } catch (e) { console.error("Cover failed", e); } 
+      finally { setGeneratingCover(false); }
+    }
+
+    setCurrentPanelIndex(0);
+    const panels = storyboard.panels;
+    for (let i = 0; i < panels.length; i++) {
+       setCurrentPanelIndex(i);
+       if (panels[i].status !== 'completed') {
+          await generateSinglePanel(panels[i], characters, currentStyle);
+       }
+    }
+    setCurrentPanelIndex(-1);
+  };
+
+  const handleRegeneratePanel = async (panel: Panel) => {
+    if (!storyboard) return;
+    await generateSinglePanel(panel, characters, storyboard.styleMode);
+  };
+
+  const handleDownload = async () => {
+    if (!resultRef.current) return;
+    try {
+      const canvas = await window.html2canvas(resultRef.current, {
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      });
+      const link = document.createElement('a');
+      link.download = `${storyboard?.title || 'manga_page'}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error("Download failed", err);
+      alert("이미지 다운로드에 실패했습니다.");
+    }
+  };
+
+  const calculateStrictLayout = (): LayoutPanel[] => {
+    if (!storyboard) return [];
+    const inputPanels = storyboard.panels;
+    if (pageTemplate === 'webtoon') {
+        return inputPanels.map(p => ({ ...p, gridColSpan: 'col-span-2', gridRowSpan: 'row-span-1', displaySize: 'wide' }));
+    }
+    if (pageTemplate === 'four_koma') {
+         return inputPanels.map(p => ({ ...p, gridColSpan: 'col-span-2', gridRowSpan: 'row-span-1', displaySize: 'wide' }));
+    }
+    const layoutPanels: LayoutPanel[] = [];
+    const blockedCells: Set<string> = new Set();
+    const isBlocked = (r: number, c: number) => blockedCells.has(`${r},${c}`);
+    const markBlocked = (r: number, c: number) => blockedCells.add(`${r},${c}`);
+
+    let currentRow = 0;
+    let currentCol = 0;
+
+    for (let i = 0; i < inputPanels.length; i++) {
+      const panel = inputPanels[i];
+      while (isBlocked(currentRow, currentCol)) {
+        currentCol++;
+        if (currentCol > 1) { currentCol = 0; currentRow++; }
+      }
+      let effectiveSize = panel.panelSize;
+      if (effectiveSize === 'wide') {
+        if (currentCol !== 0) { effectiveSize = 'square'; } 
+        else if (isBlocked(currentRow, 1)) { effectiveSize = 'square'; }
+      }
+      const lp: LayoutPanel = { 
+        ...panel, gridColSpan: 'col-span-1', gridRowSpan: 'row-span-1',
+        displaySize: effectiveSize === 'wide' ? 'wide' : effectiveSize === 'tall' ? 'tall' : 'square'
+      };
+      if (effectiveSize === 'wide') {
+        lp.gridColSpan = 'col-span-2';
+        markBlocked(currentRow, 0); markBlocked(currentRow, 1);
+        currentCol = 0; currentRow++; 
+      } else if (effectiveSize === 'tall') {
+        lp.gridRowSpan = 'row-span-2';
+        markBlocked(currentRow, currentCol); markBlocked(currentRow + 1, currentCol);
+        currentCol++;
+        if (currentCol > 1) { currentCol = 0; currentRow++; }
+      } else { 
+        lp.gridColSpan = 'col-span-1'; lp.gridRowSpan = 'row-span-1';
+        markBlocked(currentRow, currentCol);
+        currentCol++;
+        if (currentCol > 1) { currentCol = 0; currentRow++; }
+      }
+      layoutPanels.push(lp);
+    }
+    return layoutPanels;
+  };
+  const layoutPanels = calculateStrictLayout();
+
+  if (!isApiReady) return <ApiKeySelector onReady={handleApiReady} />;
+
+  return (
+    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden selection:bg-indigo-500/30 transition-colors duration-300">
+      {/* Header */}
+      <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0 z-30 transition-colors duration-300">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setShowSidebar(!showSidebar)} className="md:hidden text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-colors">
+             <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-500 p-1.5 rounded-lg shadow-lg shadow-indigo-500/20">
+              <BookOpen className="w-4 h-4 text-white" />
+            </div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white hidden sm:block">
+              MangaGen <span className="text-indigo-600 dark:text-indigo-400 font-light">Pro</span>
+            </h1>
+          </div>
+        </div>
+        
+        {/* Navigation Tabs */}
+        <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50">
+          {[
+            { id: 'input', label: '1. 스토리', icon: PenTool },
+            { id: 'preview', label: '2. 콘티/수정', icon: Layout },
+            { id: 'result', label: '3. 완성', icon: ImageIcon }
+          ].map((tab) => (
+             <button 
+                key={tab.id}
+                onClick={() => {
+                   if (tab.id === 'preview' && !storyboard) return;
+                   if (tab.id === 'result' && !storyboard) return;
+                   setActiveTab(tab.id as any);
+                }}
+                disabled={(tab.id === 'preview' || tab.id === 'result') && !storyboard}
+                className={`relative flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                   activeTab === tab.id 
+                   ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm dark:shadow-md' 
+                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30'
+                }`}
+             >
+                <tab.icon className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{tab.label}</span>
+             </button>
+          ))}
+        </div>
+
+        {/* Theme Toggle */}
+        <button 
+            onClick={toggleTheme}
+            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700"
+            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        >
+            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+        </button>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Sidebar */}
+        <aside 
+            className={`absolute md:relative z-20 h-full w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} md:translate-x-0 flex flex-col`}
+        >
+             <CharacterManager characters={characters} setCharacters={setCharacters} styleMode={styleMode} />
+             
+             {/* Bookmarks */}
+             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors duration-300">
+                <div className="flex justify-between items-center mb-3">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        <FolderOpen className="w-3 h-3"/> Saved Stories
+                    </span>
+                    <button onClick={loadAutosave} className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                        <ArchiveRestore className="w-3 h-3" /> Auto-Load
+                    </button>
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                    {bookmarks.map(bm => (
+                        <div key={bm.id} className="group flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-all" onClick={() => loadBookmark(bm)}>
+                            <div className="min-w-0">
+                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate">{bm.title}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">{bm.date}</p>
+                            </div>
+                            <button onClick={(e) => deleteBookmark(bm.id, e)} className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Trash2 className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                    {bookmarks.length === 0 && <p className="text-xs text-slate-400 dark:text-slate-600 text-center py-2">저장된 스토리가 없습니다.</p>}
+                </div>
+             </div>
+        </aside>
+
+        {/* Main Workspace */}
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative custom-scrollbar transition-colors duration-300">
+          
+          {/* TAB: INPUT */}
+          {activeTab === 'input' && (
+            <div className="max-w-4xl mx-auto p-6 md:p-12 animate-fade-in pb-32">
+               <div className="text-center mb-10">
+                   <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">당신의 이야기를 만화로 만드세요</h2>
+                   <p className="text-slate-500 dark:text-slate-400">AI가 줄거리를 분석하여 완벽한 만화 콘티와 이미지를 생성해줍니다.</p>
+               </div>
+
+               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                   {/* Main Input Area */}
+                   <div className="lg:col-span-2 space-y-4">
+                       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-1 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-500 transition-all">
+                           <div className="flex justify-between items-center px-4 py-2 border-b border-slate-100 dark:border-slate-800/50">
+                               <span className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Story Log</span>
+                               <button onClick={saveBookmark} className="text-xs flex items-center gap-1 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                   <Save className="w-3 h-3" /> Save Draft
+                               </button>
+                           </div>
+                           <textarea
+                                value={storyLog}
+                                onChange={(e) => setStoryLog(e.target.value)}
+                                placeholder="예시: 2050년 네오 서울, 비 오는 밤거리. 사립탐정 강철은 의문의 칩을 건네받는다. 그때 뒤에서 검은 양복을 입은 남자들이 나타난다..."
+                                className="w-full h-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 rounded-b-xl focus:outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-indigo-500/30 placeholder-slate-400 dark:placeholder-slate-600"
+                           />
+                       </div>
+                   </div>
+
+                   {/* Settings Panel */}
+                   <div className="space-y-4">
+                       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5 shadow-sm">
+                           <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block flex items-center gap-2">
+                                   <Palette className="w-3 h-3"/> Art Style
+                               </label>
+                               <div className="grid grid-cols-1 gap-2">
+                                   <button onClick={() => setStyleMode('bw')} className={`relative overflow-hidden p-3 rounded-lg border text-left transition-all ${styleMode === 'bw' ? 'bg-slate-100 dark:bg-white text-slate-900 dark:text-black border-slate-300 dark:border-white' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750'}`}>
+                                       <span className="relative z-10 text-sm font-bold">Manga (B&W)</span>
+                                       <div className="relative z-10 text-xs opacity-70">Traditional Japanese Ink</div>
+                                       {styleMode === 'bw' && <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/5 dark:to-transparent"></div>}
+                                   </button>
+                                   <button onClick={() => setStyleMode('color')} className={`relative overflow-hidden p-3 rounded-lg border text-left transition-all ${styleMode === 'color' ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-transparent' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-750'}`}>
+                                       <span className="relative z-10 text-sm font-bold">Webtoon (Color)</span>
+                                       <div className="relative z-10 text-xs opacity-80">Full Color Digital Art</div>
+                                   </button>
+                               </div>
+                           </div>
+
+                           <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block flex items-center gap-2">
+                                   <Monitor className="w-3 h-3"/> Cover Ratio
+                               </label>
+                               <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                                   <button onClick={() => setCoverRatio('landscape')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${coverRatio === 'landscape' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>16:9 Wide</button>
+                                   <button onClick={() => setCoverRatio('portrait')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${coverRatio === 'portrait' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>3:4 Tall</button>
+                               </div>
+                           </div>
+                       </div>
+
+                       <button
+                         onClick={handleGenerateStoryboard}
+                         disabled={isScripting || !storyLog}
+                         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-indigo-500/20 dark:shadow-indigo-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                       >
+                         {isScripting ? (
+                           <><Loader2 className="w-5 h-5 animate-spin" /> Analyzing...</>
+                         ) : (
+                           <><Sparkles className="w-5 h-5" /> Generate Script</>
+                         )}
+                       </button>
+                   </div>
+               </div>
+            </div>
+          )}
+
+          {/* TAB: PREVIEW */}
+          {activeTab === 'preview' && storyboard && (
+             <div className="max-w-6xl mx-auto p-6 md:p-8 pb-32 animate-slide-up">
+                
+                {/* Editor Header */}
+                <div className="sticky top-0 z-30 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md pb-6 mb-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-end">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3">
+                            <span className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-200 dark:border-indigo-500/30">
+                                <Edit3 className="w-4 h-4" />
+                            </span>
+                            콘티 에디터
+                        </h2>
+                        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 ml-11">AI가 생성한 컷 구성과 프롬프트를 확인하고 수정하세요.</p>
+                    </div>
+                    <button
+                        onClick={handleStartDrawing}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-600/20 dark:shadow-emerald-900/20 transition-all hover:translate-y-[-2px]"
+                    >
+                        <span>작화 시작</span>
+                        <ChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
+
+                {/* Global Info Card */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 shadow-sm">
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Title</label>
+                            <input 
+                                type="text" 
+                                value={storyboard.title}
+                                onChange={(e) => handleUpdateStoryboard('title', e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all"
+                            />
+                       </div>
+                       <div>
+                            <div className="flex justify-between mb-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase block">Cover Art Prompt</label>
+                                <button onClick={handleToggleCover} className={`text-xs flex items-center gap-1 ${storyboard.coverImagePrompt ? 'text-red-500 hover:text-red-400' : 'text-indigo-500 hover:text-indigo-400'}`}>
+                                    {storyboard.coverImagePrompt ? <><XCircle className="w-3 h-3"/> Remove</> : <><Plus className="w-3 h-3"/> Add Cover</>}
+                                </button>
+                            </div>
+                            {storyboard.coverImagePrompt ? (
+                                <textarea 
+                                    value={storyboard.coverImagePrompt}
+                                    onChange={(e) => handleUpdateStoryboard('coverImagePrompt', e.target.value)}
+                                    className="w-full h-20 bg-slate-50 dark:bg-slate-950 border border-indigo-200 dark:border-indigo-500/30 rounded-lg px-4 py-2 text-sm text-indigo-900 dark:text-indigo-100 focus:border-indigo-500 outline-none resize-none"
+                                />
+                            ) : (
+                                <div className="h-20 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg flex items-center justify-center text-slate-500 text-sm">
+                                    No cover selected
+                                </div>
+                            )}
+                       </div>
+                   </div>
+                </div>
+
+                {/* Panel List */}
+                <div className="space-y-8">
+                  {storyboard.panels.map((panel, index) => (
+                    <div key={panel.id} className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-lg hover:border-indigo-500/30 transition-all overflow-hidden">
+                      
+                      {/* Panel Toolbar */}
+                      <div className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex flex-wrap justify-between items-center gap-4">
+                          <div className="flex items-center gap-4">
+                              <span className="text-lg font-black text-indigo-500 dark:text-indigo-400 font-mono">#{panel.id}</span>
+                              <div className="h-4 w-px bg-slate-300 dark:bg-slate-700"></div>
+                              <select 
+                                value={panel.panelSize} 
+                                onChange={(e) => handleUpdatePanel(index, 'panelSize', e.target.value)}
+                                className="bg-transparent text-xs text-slate-600 dark:text-slate-300 border-none focus:ring-0 cursor-pointer font-medium uppercase tracking-wide hover:text-slate-900 dark:hover:text-white"
+                              >
+                                <option value="square">Square Layout</option>
+                                <option value="wide">Wide Layout</option>
+                                <option value="tall">Tall Layout</option>
+                              </select>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                              <button 
+                                onClick={() => handleRerollPanelScript(index)}
+                                disabled={isRerollingPanel === panel.id}
+                                className="text-xs bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2 transition-all disabled:opacity-50"
+                              >
+                                {isRerollingPanel === panel.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCcw className="w-3.5 h-3.5" />}
+                                AI Reroll
+                              </button>
+                              <button onClick={() => handleDeletePanel(index)} className="p-1.5 text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all">
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="p-6 grid grid-cols-1 xl:grid-cols-12 gap-8">
+                          
+                          {/* Left Col: Visuals (7/12) */}
+                          <div className="xl:col-span-7 space-y-5">
+                             <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                    <Eye className="w-3.5 h-3.5" /> Scene Description
+                                </label>
+                                <textarea
+                                  value={panel.description}
+                                  onChange={(e) => handleUpdatePanel(index, 'description', e.target.value)}
+                                  className="w-full h-20 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm text-slate-700 dark:text-slate-300 focus:border-indigo-500 focus:ring-0 outline-none resize-none"
+                                />
+                             </div>
+                             
+                             <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-xs font-bold text-indigo-500 uppercase">
+                                    <Sparkles className="w-3.5 h-3.5" /> Image Prompt (English)
+                                </label>
+                                <textarea
+                                  value={panel.visualPromptEn}
+                                  onChange={(e) => handleUpdatePanel(index, 'visualPromptEn', e.target.value)}
+                                  className="w-full h-32 bg-indigo-50/50 dark:bg-slate-950/50 border border-indigo-200 dark:border-indigo-500/20 rounded-xl p-3 text-sm text-indigo-900 dark:text-indigo-100/90 font-mono leading-relaxed focus:border-indigo-500 focus:ring-0 outline-none resize-none"
+                                />
+                             </div>
+                          </div>
+
+                          {/* Right Col: Story Elements (5/12) */}
+                          <div className="xl:col-span-5 flex flex-col gap-6 border-l border-slate-200 dark:border-slate-800 xl:pl-8">
+                              {/* Characters */}
+                              <div>
+                                  <label className="text-xs font-bold text-slate-500 uppercase mb-3 block">In this Scene</label>
+                                  <div className="flex flex-wrap gap-2">
+                                      {characters.map(char => (
+                                          <button
+                                            key={char.id}
+                                            onClick={() => {
+                                                const current = panel.charactersInPanel;
+                                                const newChars = current.includes(char.name) 
+                                                ? current.filter(n => n !== char.name)
+                                                : [...current, char.name];
+                                                handleUpdatePanel(index, 'charactersInPanel', newChars);
+                                            }}
+                                            className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-full border transition-all ${
+                                                panel.charactersInPanel.includes(char.name)
+                                                ? 'bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-500/20'
+                                                : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-700 dark:hover:text-slate-200'
+                                            }`}
+                                          >
+                                            {char.imageBase64 && <img src={char.imageBase64} alt="" className="w-4 h-4 rounded-full object-cover" />}
+                                            {char.name}
+                                          </button>
+                                      ))}
+                                      {characters.length === 0 && <span className="text-xs text-slate-400 dark:text-slate-600">No characters registered</span>}
+                                  </div>
+                              </div>
+
+                              {/* Dialogues */}
+                              <div className="flex-1 bg-slate-50 dark:bg-slate-950/30 rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+                                  <div className="flex justify-between items-center mb-4">
+                                      <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
+                                          <MessageSquare className="w-3.5 h-3.5" /> Dialogues
+                                      </label>
+                                      <button onClick={() => addDialogue(index)} className="text-xs text-indigo-500 hover:text-indigo-400 flex items-center gap-1">
+                                          <Plus className="w-3 h-3" /> Add
+                                      </button>
+                                  </div>
+                                  <div className="space-y-3">
+                                      {panel.dialogues?.map((dialogue, dIndex) => (
+                                          <div key={dIndex} className="flex gap-2 items-start group/dialogue">
+                                              <div className="flex-1 space-y-1">
+                                                  <div className="flex gap-2">
+                                                      <select
+                                                          value={dialogue.speaker}
+                                                          onChange={(e) => updateDialogue(index, dIndex, 'speaker', e.target.value)}
+                                                          className="bg-white dark:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-1 focus:border-indigo-500 outline-none max-w-[80px]"
+                                                      >
+                                                          <option value="Unknown">???</option>
+                                                          {characters.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                                                      </select>
+                                                      <select
+                                                          value={dialogue.type}
+                                                          onChange={(e) => updateDialogue(index, dIndex, 'type', e.target.value as any)}
+                                                          className="bg-white dark:bg-slate-800 text-[10px] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-1 focus:border-indigo-500 outline-none"
+                                                      >
+                                                          <option value="speech">말풍선</option>
+                                                          <option value="shout">외침</option>
+                                                          <option value="thought">생각</option>
+                                                          <option value="narration">해설</option>
+                                                      </select>
+                                                  </div>
+                                                  <input 
+                                                      type="text"
+                                                      value={dialogue.text}
+                                                      onChange={(e) => updateDialogue(index, dIndex, 'text', e.target.value)}
+                                                      placeholder="..."
+                                                      className="w-full bg-transparent border-b border-slate-200 dark:border-slate-800 focus:border-indigo-500 text-sm py-1 text-slate-900 dark:text-slate-200 outline-none placeholder-slate-400 dark:placeholder-slate-700"
+                                                  />
+                                              </div>
+                                              <button 
+                                                  onClick={() => removeDialogue(index, dIndex)}
+                                                  className="mt-1 text-slate-400 hover:text-red-500 opacity-0 group-hover/dialogue:opacity-100 transition-opacity"
+                                              >
+                                                  <X className="w-3 h-3" />
+                                              </button>
+                                          </div>
+                                      ))}
+                                      {(!panel.dialogues || panel.dialogues.length === 0) && (
+                                          <div className="text-center py-4">
+                                              <Quote className="w-6 h-6 text-slate-300 dark:text-slate-800 mx-auto mb-1" />
+                                              <span className="text-[10px] text-slate-400 dark:text-slate-600">No dialogue</span>
+                                          </div>
+                                      )}
+                                  </div>
+                              </div>
+                          </div>
+                      </div>
+                    </div>
+                  ))}
+
+                   <button 
+                     onClick={handleAddPanel}
+                     className="w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-800 text-slate-500 rounded-2xl hover:border-indigo-500/50 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-slate-900 transition-all flex items-center justify-center gap-2 group"
+                   >
+                       <FilePlus className="w-6 h-6 group-hover:scale-110 transition-transform" /> 
+                       <span className="font-bold">Add New Scene</span>
+                   </button>
+                </div>
+             </div>
+          )}
+
+          {/* TAB: RESULT */}
+          {activeTab === 'result' && storyboard && (
+            <div className="w-full h-full bg-slate-100 dark:bg-slate-950 p-4 md:p-8 overflow-y-auto flex flex-col items-center animate-fade-in custom-scrollbar transition-colors duration-300">
+              
+              {/* Toolbar */}
+              <div className="w-full max-w-[800px] sticky top-0 z-40 mb-6">
+                 <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl">
+                     <div className="text-sm font-bold flex items-center gap-3 pl-2">
+                        {(currentPanelIndex !== -1 || generatingCover) ? (
+                            <div className="flex items-center gap-2 text-indigo-500 dark:text-indigo-400">
+                               <Loader2 className="w-4 h-4 animate-spin" />
+                               <span>
+                                  {generatingCover ? "Generating Cover..." : `Painting Panel ${currentPanelIndex + 1}/${storyboard.panels.length}...`}
+                               </span>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 text-emerald-500 dark:text-emerald-400">
+                                <span className="relative flex h-2.5 w-2.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                                <span>Completed</span>
+                            </div>
+                        )}
+                     </div>
+
+                     <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <select 
+                            value={pageTemplate}
+                            onChange={(e) => setPageTemplate(e.target.value as PageTemplate)}
+                            className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:border-indigo-500 outline-none"
+                        >
+                            <option value="dynamic">Layout: Dynamic</option>
+                            <option value="webtoon">Layout: Webtoon</option>
+                            <option value="four_koma">Layout: 4-Koma</option>
+                        </select>
+
+                        <button 
+                        onClick={handleDownload}
+                        disabled={currentPanelIndex !== -1 || generatingCover}
+                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-slate-500 shadow-lg shadow-indigo-500/20 dark:shadow-indigo-900/20"
+                        >
+                            <Download className="w-4 h-4" /> Export
+                        </button>
+                     </div>
+                 </div>
+              </div>
+
+              {/* Canvas Container */}
+              <div className="bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden mb-20 transition-colors duration-300">
+                  <div ref={resultRef} className={`w-full max-w-[800px] bg-white mx-auto p-4 md:p-8 box-border min-h-[1000px] ${pageTemplate === 'webtoon' ? 'pb-20' : ''}`}>
+                    
+                    {/* Cover */}
+                    {(storyboard.coverImagePrompt || storyboard.coverImageUrl) && (
+                        <div className="mb-6 w-full relative">
+                        {storyboard.coverImageUrl ? (
+                            <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} relative overflow-hidden border-[4px] border-black shadow-lg`}>
+                                <img 
+                                src={storyboard.coverImageUrl} 
+                                alt="Cover" 
+                                className="w-full h-full object-cover"
+                                style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
+                                />
+                                <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                                <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
+                                    {storyboard.title}
+                                </h2>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
+                                {generatingCover ? (
+                                    <>
+                                        <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                        <span className="font-comic text-gray-500 animate-pulse">Drawing Cover...</span>
+                                    </>
+                                ) : (
+                                    <h1 className="font-manga text-4xl text-black text-center px-4">{storyboard.title}</h1>
+                                )}
+                            </div>
+                        )}
+                        </div>
+                    )}
+
+                    {/* Manga Grid */}
+                    <div className={`w-full ${pageTemplate === 'dynamic' ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-4'}`}>
+                        {layoutPanels.map((panel) => (
+                            <div 
+                              key={panel.id} 
+                              className={`${panel.gridColSpan} ${panel.gridRowSpan} relative`}
+                            >
+                                <ComicPanel 
+                                    panel={{...panel, panelSize: panel.displaySize}} 
+                                    onRegenerate={handleRegeneratePanel}
+                                    styleMode={storyboard.styleMode}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="mt-16 flex justify-between text-black/40 font-mono text-[10px] border-t-2 border-black/10 pt-2 uppercase tracking-widest">
+                        <span>Generated by MangaGen Pro</span>
+                        <span>{new Date().toLocaleDateString()}</span>
+                    </div>
+                  </div>
+              </div>
+            </div>
+          )}
+
+        </main>
+      </div>
+    </div>
+  );
+};
+
+export default App;

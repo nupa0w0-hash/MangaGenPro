@@ -1,0 +1,5 @@
+{
+  "name": "MangaGen Pro-1",
+  "description": "Professional AI Manga creation tool using Gemini 3 Pro and Nano Banana Pro. Creates black and white Japanese-style manga pages.",
+  "requestFramePermissions": []
+}
