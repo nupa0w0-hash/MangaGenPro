@@ -3,7 +3,13 @@ import { Character, Panel, Storyboard, StyleMode } from "../types";
 
 // We need to initialize the client dynamically to ensure we pick up the user-selected key
 const getAiClient = () => {
-  return new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+  if (!apiKey) {
+    console.error("API Key is missing. Please set it in the settings.");
+    // Fallback or throw error, but throwing allows the UI to handle it if caught
+    // However, in this app flow, we check for key before calling service usually.
+  }
+  return new GoogleGenAI({ apiKey: apiKey || '' });
 };
 
 // Helper for retry logic with exponential backoff

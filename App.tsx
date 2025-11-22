@@ -3,12 +3,12 @@ import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookma
 import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
-import ApiKeySelector from './components/ApiKeySelector';
+
 import { 
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, Palette, XCircle, FilePlus, ArchiveRestore,
-  Menu, X, MessageSquare, Quote, Eye, Sun, Moon
+  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -20,6 +20,7 @@ type LayoutPanel = Panel & {
 
 const App: React.FC = () => {
   const [isApiReady, setIsApiReady] = useState(false);
+  const [inputApiKey, setInputApiKey] = useState(''); // Input state for API Key
   
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -46,7 +47,7 @@ const App: React.FC = () => {
   const [generatingCover, setGeneratingCover] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // Initialize Theme
+  // Initialize Theme & Check API Key
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -57,6 +58,12 @@ const App: React.FC = () => {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+
+    // Check for saved key
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) {
+        setIsApiReady(true);
     }
   }, []);
 
@@ -69,6 +76,17 @@ const App: React.FC = () => {
     } else {
       document.documentElement.classList.remove('dark');
     }
+  };
+
+  // API Key Save Handler
+  const handleSaveApiKey = () => {
+      if (!inputApiKey.trim()) {
+          alert("API 키를 입력해주세요.");
+          return;
+      }
+      localStorage.setItem('gemini_api_key', inputApiKey);
+      setIsApiReady(true);
+      window.location.reload(); 
   };
 
   // Load bookmarks and Autosave on init
@@ -171,8 +189,6 @@ const App: React.FC = () => {
       }
   };
 
-  const handleApiReady = () => setIsApiReady(true);
-
   const handleGenerateStoryboard = async () => {
     if (!storyLog.trim()) return;
     if (characters.length === 0) {
@@ -186,7 +202,8 @@ const App: React.FC = () => {
       setStoryboard(result);
       setActiveTab('preview');
     } catch (error) {
-      alert("스토리보드 생성에 실패했습니다. 다시 시도해주세요.");
+      console.error(error);
+      alert("스토리보드 생성 실패. API Key가 올바른지 확인하거나 잠시 후 다시 시도하세요.");
     } finally {
       setIsScripting(false);
     }
@@ -228,7 +245,7 @@ const App: React.FC = () => {
            if (!confirm("표지를 삭제하시겠습니까?")) return;
            setStoryboard({ ...storyboard, coverImagePrompt: '', coverImageUrl: undefined });
       } else {
-           setStoryboard({ ...storyboard, coverImagePrompt: 'Detailed cover art description based on the theme...', coverImageUrl: undefined });
+           setStoryboard({ ...storyboard, coverImagePrompt: 'Detailed cover art description based on the story theme...', coverImageUrl: undefined });
       }
   };
 
@@ -346,7 +363,13 @@ const App: React.FC = () => {
 
   const handleDownload = async () => {
     if (!resultRef.current) return;
+    // @ts-ignore
+    if (!window.html2canvas) {
+        alert("html2canvas 라이브러리가 로드되지 않았습니다.");
+        return;
+    }
     try {
+      // @ts-ignore
       const canvas = await window.html2canvas(resultRef.current, {
         scale: 2, 
         useCORS: true,
@@ -416,8 +439,64 @@ const App: React.FC = () => {
   };
   const layoutPanels = calculateStrictLayout();
 
-  if (!isApiReady) return <ApiKeySelector onReady={handleApiReady} />;
+  // --------------------------------------------------------------------------------
+  // 🔑 API Key Input Screen (Inline)
+  // --------------------------------------------------------------------------------
+  if (!isApiReady) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-300">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-md w-full animate-fade-in">
+                <div className="flex justify-center mb-6">
+                    <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-3 rounded-xl shadow-lg shadow-indigo-500/20">
+                        <BookOpen className="w-8 h-8 text-white" />
+                    </div>
+                </div>
+                
+                <h1 className="text-2xl font-bold text-center text-slate-900 dark:text-white mb-2">MangaGen Pro</h1>
+                <p className="text-center text-slate-500 dark:text-slate-400 mb-8 text-sm">
+                    AI 만화 창작 도구에 오신 것을 환영합니다.<br/>
+                    Google Gemini API 키를 입력하여 시작하세요.
+                </p>
 
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2 ml-1">Google API Key</label>
+                        <div className="relative">
+                            <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input 
+                                type="password" 
+                                value={inputApiKey}
+                                onChange={(e) => setInputApiKey(e.target.value)}
+                                placeholder="sk-..."
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 outline-none transition-all"
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-2 px-1">
+                            * 키는 브라우저(Local Storage)에만 저장되며 서버로 전송되지 않습니다.
+                        </p>
+                    </div>
+
+                    <button 
+                        onClick={handleSaveApiKey}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2"
+                    >
+                        시작하기 <ChevronRight className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="text-center pt-4">
+                         <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-xs text-indigo-500 hover:underline">
+                            API 키가 없으신가요? 여기서 발급받으세요.
+                         </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+      );
+  }
+
+  // --------------------------------------------------------------------------------
+  // Main App
+  // --------------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden selection:bg-indigo-500/30 transition-colors duration-300">
       {/* Header */}
@@ -463,14 +542,28 @@ const App: React.FC = () => {
           ))}
         </div>
 
-        {/* Theme Toggle */}
-        <button 
-            onClick={toggleTheme}
-            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-white transition-colors border border-slate-200 dark:border-slate-700"
-            title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
-        >
-            {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-        </button>
+        {/* Theme & Reset Key */}
+        <div className="flex gap-2">
+            <button 
+                onClick={() => {
+                    if(confirm("API 키를 삭제하고 초기 화면으로 돌아가시겠습니까?")) {
+                        localStorage.removeItem('gemini_api_key');
+                        window.location.reload();
+                    }
+                }}
+                className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors border border-slate-200 dark:border-slate-700"
+                title="Reset API Key"
+            >
+                <Key className="w-4 h-4" />
+            </button>
+            <button 
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-white transition-colors border border-slate-200 dark:border-slate-700"
+                title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
@@ -529,10 +622,10 @@ const App: React.FC = () => {
                                </button>
                            </div>
                            <textarea
-                                value={storyLog}
-                                onChange={(e) => setStoryLog(e.target.value)}
-                                placeholder="예시: 2050년 네오 서울, 비 오는 밤거리. 사립탐정 강철은 의문의 칩을 건네받는다. 그때 뒤에서 검은 양복을 입은 남자들이 나타난다..."
-                                className="w-full h-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 rounded-b-xl focus:outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-indigo-500/30 placeholder-slate-400 dark:placeholder-slate-600"
+                               value={storyLog}
+                               onChange={(e) => setStoryLog(e.target.value)}
+                               placeholder="예시: 2050년 네오 서울, 비 오는 밤거리. 사립탐정 강철은 의문의 칩을 건네받는다. 그때 뒤에서 검은 양복을 입은 남자들이 나타난다..."
+                               className="w-full h-80 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 rounded-b-xl focus:outline-none resize-none leading-relaxed text-sm md:text-base selection:bg-indigo-500/30 placeholder-slate-400 dark:placeholder-slate-600"
                            />
                        </div>
                    </div>
@@ -642,7 +735,7 @@ const App: React.FC = () => {
                    </div>
                 </div>
 
-                {/* Panel List */}
+                {/* Panel Editor List */}
                 <div className="space-y-8">
                   {storyboard.panels.map((panel, index) => (
                     <div key={panel.id} className="group relative bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm dark:shadow-lg hover:border-indigo-500/30 transition-all overflow-hidden">
@@ -860,7 +953,7 @@ const App: React.FC = () => {
               </div>
 
               {/* Canvas Container */}
-              <div className="w-full px-4 md:px-8 pb-20 flex justify-center">
+              <div className="w-full px-4 md:px-8 pb-40 flex justify-center">
                   <div className="w-full max-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
                       <div ref={resultRef} className={`w-full bg-white mx-auto p-4 md:p-8 box-border min-h-[1000px] ${pageTemplate === 'webtoon' ? 'pb-20' : ''}`}>
                         
