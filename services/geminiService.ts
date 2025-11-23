@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { Character, Panel, Storyboard, StyleMode } from "../types";
+import { Character, Panel, Storyboard, StyleMode, RenderMode } from "../types";
 
 // We need to initialize the client dynamically to ensure we pick up the user-selected key
 const getAiClient = () => {
@@ -55,7 +55,8 @@ export const generateStoryboard = async (
   storyLog: string,
   characters: Character[],
   coverAspectRatio: 'landscape' | 'portrait',
-  styleMode: StyleMode
+  styleMode: StyleMode,
+  renderMode: RenderMode = 'overlay'
 ): Promise<Storyboard> => {
   const ai = getAiClient();
 
@@ -158,6 +159,7 @@ export const generateStoryboard = async (
       ...data,
       coverAspectRatio: coverAspectRatio,
       styleMode: styleMode,
+      renderMode: renderMode,
       panels: data.panels.map((p: any) => ({ ...p, status: 'pending' }))
     };
 
@@ -321,7 +323,8 @@ export const generateCoverImage = async (
 export const generatePanelImage = async (
   panel: Panel,
   allCharacters: Character[],
-  styleMode: StyleMode
+  styleMode: StyleMode,
+  renderMode: RenderMode
 ): Promise<string> => {
   const ai = getAiClient();
 
@@ -353,6 +356,18 @@ export const generatePanelImage = async (
       ? "Style: Professional Japanese Manga (Black and White). Technique: Detailed Ink lines, Screen tones (Ben-Day dots), High Contrast."
       : "Style: Professional Korean Webtoon (Full Color). Technique: Digital Art, Cel Shading, Vibrant Colors, Clean lines.";
 
+  // Construct Dialogue Text for AI Native Mode
+  let dialoguePrompt = "";
+  const hasDialogue = panel.dialogues && panel.dialogues.length > 0;
+
+  if (renderMode === 'native' && hasDialogue) {
+      dialoguePrompt = "\n\nDIALOGUE & BUBBLES:\nDraw the speech bubbles and text directly in the image as described:\n";
+      panel.dialogues.forEach(d => {
+          dialoguePrompt += `- ${d.speaker}: "${d.text}" (${d.type})\n`;
+      });
+      dialoguePrompt += "\nEnsure the speech bubbles are placed naturally near the speakers and text is legible.";
+  }
+
   // 2. Main Prompt
   const mainPrompt = `
     ${stylePrompt}
@@ -362,7 +377,10 @@ export const generatePanelImage = async (
     
     Characters: ${panel.charactersInPanel.join(", ")}.
     Composition: Dynamic manga composition. 
-    NO TEXT OR SPEECH BUBBLES IN IMAGE.
+    ${renderMode === 'native' && hasDialogue
+       ? `INCLUDE TEXT AND SPEECH BUBBLES based on the dialogue provided below. ${dialoguePrompt}`
+       : "NO TEXT OR SPEECH BUBBLES IN IMAGE."
+    }
   `;
   parts.push({ text: mainPrompt });
 

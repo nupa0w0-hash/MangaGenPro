@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark } from './types';
+import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode } from './types';
 import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
   const [coverRatio, setCoverRatio] = useState<'landscape' | 'portrait'>('landscape');
   const [styleMode, setStyleMode] = useState<StyleMode>('bw');
+  const [renderMode, setRenderMode] = useState<RenderMode>('overlay');
   const [pageTemplate, setPageTemplate] = useState<PageTemplate>('dynamic');
   
   // Bookmark State
@@ -103,6 +104,7 @@ const App: React.FC = () => {
             if (data.characters) setCharacters(data.characters);
             if (data.storyboard) setStoryboard(data.storyboard);
             if (data.styleMode) setStyleMode(data.styleMode);
+            if (data.renderMode) setRenderMode(data.renderMode);
             if (data.coverRatio) setCoverRatio(data.coverRatio);
             if (data.pageTemplate) setPageTemplate(data.pageTemplate);
         } catch(e) { console.error("Autosave load failed", e); }
@@ -125,7 +127,7 @@ const App: React.FC = () => {
       }, 2000); 
 
       return () => clearTimeout(timer);
-  }, [storyLog, characters, storyboard, styleMode, coverRatio, pageTemplate]);
+  }, [storyLog, characters, storyboard, styleMode, renderMode, coverRatio, pageTemplate]);
 
   const saveBookmark = () => {
     if (!storyLog.trim()) return;
@@ -153,6 +155,7 @@ const App: React.FC = () => {
         setCharacters(bm.characters || []);
         setStoryboard(bm.storyboard);
         if (bm.styleMode) setStyleMode(bm.styleMode);
+        if (bm.renderMode) setRenderMode(bm.renderMode);
         setCoverRatio(bm.coverRatio || 'landscape');
         setPageTemplate(bm.pageTemplate || 'dynamic');
         
@@ -178,6 +181,7 @@ const App: React.FC = () => {
             if (data.characters) setCharacters(data.characters);
             if (data.storyboard) setStoryboard(data.storyboard);
             if (data.styleMode) setStyleMode(data.styleMode);
+            if (data.renderMode) setRenderMode(data.renderMode);
             if (data.coverRatio) setCoverRatio(data.coverRatio);
             if (data.pageTemplate) setPageTemplate(data.pageTemplate);
             
@@ -198,7 +202,7 @@ const App: React.FC = () => {
 
     setIsScripting(true);
     try {
-      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode);
+      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, renderMode);
       setStoryboard(result);
       setActiveTab('preview');
     } catch (error) {
@@ -300,7 +304,7 @@ const App: React.FC = () => {
     setStoryboard({ ...storyboard, [field]: value });
   };
 
-  const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode) => {
+  const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode, currentRenderMode: RenderMode) => {
      setStoryboard(prev => {
         if (!prev) return null;
         return {
@@ -310,7 +314,7 @@ const App: React.FC = () => {
      });
 
      try {
-        const imageUrl = await generatePanelImage(panel, allChars, currentStyle);
+        const imageUrl = await generatePanelImage(panel, allChars, currentStyle, currentRenderMode);
         setStoryboard(prev => {
             if (!prev) return null;
             return {
@@ -336,6 +340,7 @@ const App: React.FC = () => {
     setActiveTab('result');
     
     const currentStyle = storyboard.styleMode;
+    const currentRenderMode = storyboard.renderMode;
     if (storyboard.coverImagePrompt && !storyboard.coverImageUrl) {
       setGeneratingCover(true);
       try {
@@ -350,7 +355,7 @@ const App: React.FC = () => {
     for (let i = 0; i < panels.length; i++) {
        setCurrentPanelIndex(i);
        if (panels[i].status !== 'completed') {
-          await generateSinglePanel(panels[i], characters, currentStyle);
+          await generateSinglePanel(panels[i], characters, currentStyle, currentRenderMode);
        }
     }
     setCurrentPanelIndex(-1);
@@ -358,7 +363,7 @@ const App: React.FC = () => {
 
   const handleRegeneratePanel = async (panel: Panel) => {
     if (!storyboard) return;
-    await generateSinglePanel(panel, characters, storyboard.styleMode);
+    await generateSinglePanel(panel, characters, storyboard.styleMode, storyboard.renderMode);
   };
 
   const handleDownload = async () => {
@@ -657,6 +662,20 @@ const App: React.FC = () => {
                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                                    <button onClick={() => setCoverRatio('landscape')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${coverRatio === 'landscape' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>16:9 Wide</button>
                                    <button onClick={() => setCoverRatio('portrait')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${coverRatio === 'portrait' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>3:4 Tall</button>
+                               </div>
+                           </div>
+
+                           <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block flex items-center gap-2">
+                                   <MessageSquare className="w-3 h-3"/> Text Rendering
+                               </label>
+                               <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+                                   <button onClick={() => setRenderMode('overlay')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${renderMode === 'overlay' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                                     Overlay (HTML)
+                                   </button>
+                                   <button onClick={() => setRenderMode('native')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${renderMode === 'native' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
+                                     AI Native (Baked-in)
+                                   </button>
                                </div>
                            </div>
                        </div>
@@ -1000,6 +1019,7 @@ const App: React.FC = () => {
                                         panel={{...panel, panelSize: panel.displaySize}} 
                                         onRegenerate={handleRegeneratePanel}
                                         styleMode={storyboard.styleMode}
+                                        renderMode={storyboard.renderMode}
                                     />
                                 </div>
                             ))}
