@@ -7,15 +7,20 @@ interface Props {
   onRegenerate: (panel: Panel) => void;
   styleMode: StyleMode;
   renderMode?: RenderMode;
+  isFreeMode?: boolean;
 }
 
-const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay' }) => {
+const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay', isFreeMode = false }) => {
   // Determine aspect ratio styles based on panelSize
-  // Ensure the container matches the generated image's aspect ratio
-  const aspectRatioClass = 
-    panel.panelSize === 'wide' ? 'aspect-[16/9]' : 
-    panel.panelSize === 'tall' ? 'aspect-[3/4]' : 
-    'aspect-square';
+  // If in free canvas mode (dynamic template), we don't force aspect ratio via CSS
+  // allowing the container (Rnd) to determine the size.
+  const aspectRatioClass = isFreeMode
+    ? 'w-full h-full'
+    : (
+        panel.panelSize === 'wide' ? 'aspect-[16/9]' :
+        panel.panelSize === 'tall' ? 'aspect-[3/4]' :
+        'aspect-square'
+      );
 
   // Bubble rendering logic
   const renderBubbles = () => {
