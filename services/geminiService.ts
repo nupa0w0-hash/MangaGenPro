@@ -164,6 +164,11 @@ export const generateStoryboard = async (
     const jsonString = text.replace(/```json\n?|```/g, "");
     const data = JSON.parse(jsonString);
     
+    // Automatically append title instruction to cover prompt so it's baked in
+    if (data.title && data.coverImagePrompt) {
+        data.coverImagePrompt += `\n\nTitle Text: Include the title "${data.title}" prominently in the image. The typography should be stylized to match the genre (e.g., bold, metallic, or calligraphic) and integrated into the composition.`;
+    }
+
     return {
       ...data,
       coverAspectRatio: coverAspectRatio,
@@ -353,7 +358,7 @@ export const generateCoverImage = async (
     Prompt: ${prompt}
     
     Ensure: High contrast, clean lines. Looks like a published volume cover.
-    NO TEXT (Title/Credits) should be in the image.
+    IMPORTANT: If the prompt specifies a Title Text, ensure it is drawn clearly and artistically in the image.
   `;
   parts.push({ text: mainPrompt });
 

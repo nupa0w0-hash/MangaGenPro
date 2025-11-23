@@ -972,19 +972,10 @@ const App: React.FC = () => {
 
                 {/* Global Info Card */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 shadow-sm">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       <div>
-                            <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Title</label>
-                            <input 
-                                type="text" 
-                                value={storyboard.title}
-                                onChange={(e) => handleUpdateStoryboard('title', e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-4 py-2 text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all"
-                            />
-                       </div>
+                   <div className="grid grid-cols-1 gap-6">
                        <div>
                             <div className="flex justify-between mb-2">
-                                <label className="text-xs font-bold text-slate-500 uppercase block">Cover Art Prompt</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase block">Cover Art Prompt (Include Title Here)</label>
                                 <div className="flex gap-2">
                                     {storyboard.coverImagePrompt && (
                                         <>
@@ -1335,15 +1326,6 @@ const App: React.FC = () => {
                                                     className="w-full h-full object-cover"
                                                     style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                                     />
-                                                    <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end items-center text-center min-h-[40%]">
-                                                        <h2
-                                                            className="text-4xl md:text-6xl font-bold text-white font-serif tracking-tight leading-tight drop-shadow-lg break-keep mb-2"
-                                                            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}
-                                                        >
-                                                            {storyboard.title}
-                                                        </h2>
-                                                        <div className="w-12 h-1 bg-indigo-500/80 rounded-full mb-2"></div>
-                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className={`w-full h-full border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
@@ -1465,15 +1447,6 @@ const App: React.FC = () => {
                                             className="w-full h-full object-cover"
                                             style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                             />
-                                            <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end items-center text-center min-h-[40%]">
-                                                <h2
-                                                    className="text-4xl md:text-6xl font-bold text-white font-serif tracking-tight leading-tight drop-shadow-lg break-keep mb-2"
-                                                    style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}
-                                                >
-                                                    {storyboard.title}
-                                                </h2>
-                                                <div className="w-12 h-1 bg-indigo-500/80 rounded-full mb-2"></div>
-                                            </div>
                                         </div>
                                     ) : (
                                         <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
