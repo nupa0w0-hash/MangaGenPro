@@ -611,13 +611,17 @@ const App: React.FC = () => {
         // its parent does. We are capturing the inner content purely)
         clone.style.transform = 'none';
         clone.style.minHeight = 'auto';
-        clone.style.height = 'auto';
+
+        // Explicitly set height to scrollHeight to ensure full capture
+        const fullHeight = resultRef.current.scrollHeight;
+        clone.style.height = `${fullHeight}px`;
+        exportContainer.style.height = `${fullHeight}px`;
 
         exportContainer.appendChild(clone);
 
         // Wait for images to be "ready" in the new DOM context
         // (They should be cached, but a small delay helps html2canvas catch up)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         const canvas = await html2canvas(clone, {
             scale: 2,
@@ -625,7 +629,10 @@ const App: React.FC = () => {
             allowTaint: false,
             backgroundColor: null,
             width: 800, // Force width
+            height: fullHeight, // Force height
             windowWidth: 800, // Force window width context
+            windowHeight: fullHeight, // Force window height context
+            scrollY: 0, // Reset scroll
         });
 
         const link = document.createElement('a');
@@ -1421,7 +1428,7 @@ const App: React.FC = () => {
                                         enableUserSelectHack={false}
                                         dragHandleClassName="drag-handle"
                                         resizeHandleStyles={{
-                                            bottomRight: { cursor: 'se-resize', width: 20, height: 20, bottom: 0, right: 0, background: 'transparent' }
+                                            bottomRight: { cursor: 'se-resize', width: 40, height: 40, bottom: -10, right: -10, background: 'transparent' }
                                         }}
                                     >
                                         <div className="w-full h-full relative shadow-lg hover:shadow-xl transition-shadow drag-handle cursor-move">
@@ -1434,36 +1441,36 @@ const App: React.FC = () => {
                                             />
 
                                             {/* Resize Handle Visual */}
-                                            <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50" />
+                                            <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none" />
 
-                                            {/* Move Indicator (Top Center) */}
-                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none">
+                                            {/* Move Indicator (Top Center) - Now acts as a drag handle */}
+                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move">
                                                 <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
                                                     <Move className="w-3 h-3" />
                                                     <span className="font-bold">Drag to Move</span>
                                                 </div>
                                             </div>
 
-                                            {/* Size Presets (Floating) */}
-                                            <div className="absolute top-2 left-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
+                                            {/* Size Presets (Floating) - Always visible on mobile */}
+                                            <div className="absolute top-2 left-2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
                                                 <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); }}
-                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
                                                         title="Square (300x300)"
                                                     >
                                                         <div className="w-3 h-3 border border-current"></div>
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); }}
-                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
                                                         title="Wide (616x300)"
                                                     >
                                                         <div className="w-5 h-3 border border-current"></div>
                                                     </button>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); }}
-                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
                                                         title="Tall (300x450)"
                                                     >
                                                         <div className="w-3 h-5 border border-current"></div>
