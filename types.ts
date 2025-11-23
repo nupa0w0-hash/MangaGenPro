@@ -23,6 +23,7 @@ export interface Panel {
 }
 
 export type StyleMode = 'bw' | 'color';
+export type RenderMode = 'overlay' | 'native';
 
 export interface Storyboard {
   title: string;
@@ -31,6 +32,7 @@ export interface Storyboard {
   coverAspectRatio: 'landscape' | 'portrait'; // Aspect ratio for the cover
   panels: Panel[];
   styleMode: StyleMode;
+  renderMode: RenderMode;
 }
 
 export interface ApiKeyStatus {
@@ -50,6 +52,7 @@ export interface Bookmark {
   styleMode: StyleMode;
   coverRatio: 'landscape' | 'portrait';
   pageTemplate: PageTemplate;
+  renderMode?: RenderMode;
 }
 
 // Extend Window interface for AI Studio specific methods and html2canvas

@@ -1,14 +1,15 @@
 import React from 'react';
-import { Panel, StyleMode } from '../types';
+import { Panel, StyleMode, RenderMode } from '../types';
 import { RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 
 interface Props {
   panel: Panel;
   onRegenerate: (panel: Panel) => void;
   styleMode: StyleMode;
+  renderMode?: RenderMode;
 }
 
-const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode }) => {
+const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay' }) => {
   // Determine aspect ratio styles based on panelSize
   const aspectRatioClass = 
     panel.panelSize === 'wide' ? 'aspect-[16/9]' : 
@@ -17,6 +18,7 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode }) => {
 
   // Bubble rendering logic
   const renderBubbles = () => {
+    if (renderMode === 'native') return null;
     if (!panel.dialogues || panel.dialogues.length === 0) return null;
 
     return panel.dialogues.map((dialogue, index) => {
