@@ -1428,6 +1428,7 @@ const App: React.FC = () => {
                                         className="group/panel-container"
                                         enableUserSelectHack={false}
                                         dragHandleClassName="drag-handle"
+                                        cancel=".no-drag"
                                         resizeHandleStyles={{
                                             bottomRight: { cursor: 'se-resize', width: 40, height: 40, bottom: -10, right: -10, background: 'transparent' }
                                         }}
@@ -1453,46 +1454,43 @@ const App: React.FC = () => {
                                             </div>
 
                                             {/* Size Presets (Floating) - Toggleable on click */}
-                                            <div className="absolute top-2 left-2 z-50 flex gap-1">
+                                            <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag">
                                                 {activeSettingsPanel === idx ? (
-                                                    <div onPointerDown={(e) => e.stopPropagation()} className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in">
+                                                    <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
                                                         <button
-                                                            onPointerDown={(e) => e.stopPropagation()}
                                                             onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
                                                             title="Square (300x300)"
                                                         >
                                                             <div className="w-3 h-3 border border-current"></div>
                                                         </button>
                                                         <button
-                                                            onPointerDown={(e) => e.stopPropagation()}
                                                             onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
                                                             title="Wide (616x300)"
                                                         >
                                                             <div className="w-5 h-3 border border-current"></div>
                                                         </button>
                                                         <button
-                                                            onPointerDown={(e) => e.stopPropagation()}
                                                             onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
                                                             title="Tall (300x450)"
                                                         >
                                                             <div className="w-3 h-5 border border-current"></div>
                                                         </button>
                                                         <button
-                                                            onPointerDown={(e) => e.stopPropagation()}
                                                             onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-400"
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-400 no-drag"
+                                                            aria-label="Close layout settings"
                                                         >
                                                             <X className="w-3 h-3" />
                                                         </button>
                                                     </div>
                                                 ) : (
                                                     <button
-                                                        onPointerDown={(e) => e.stopPropagation()}
                                                         onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
-                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100"
+                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 no-drag"
+                                                        aria-label="Open layout settings"
                                                     >
                                                        <Settings2 className="w-4 h-4" />
                                                     </button>
