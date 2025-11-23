@@ -422,7 +422,15 @@ const App: React.FC = () => {
     setIsScripting(true);
     try {
       const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, renderMode);
-      setStoryboard(result);
+
+      // Ensure no layout data is present to force fresh initialization (Auto-Reset)
+      const cleanResult: Storyboard = {
+           ...result,
+           panels: result.panels.map(p => ({...p, layout: undefined})),
+           coverLayout: undefined
+      };
+
+      setStoryboard(cleanResult);
       setActiveTab('preview');
     } catch (error) {
       console.error(error);
@@ -1327,13 +1335,14 @@ const App: React.FC = () => {
                                                     className="w-full h-full object-cover"
                                                     style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                                     />
-                                                    <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rotate-[-2deg]">
-                                                    <h2
-                                                        className="text-4xl md:text-6xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep"
-                                                        style={{ textShadow: '2px 2px 0px #e2e8f0' }}
-                                                    >
-                                                        {storyboard.title}
-                                                    </h2>
+                                                    <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end items-center text-center min-h-[40%]">
+                                                        <h2
+                                                            className="text-4xl md:text-6xl font-bold text-white font-serif tracking-tight leading-tight drop-shadow-lg break-keep mb-2"
+                                                            style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}
+                                                        >
+                                                            {storyboard.title}
+                                                        </h2>
+                                                        <div className="w-12 h-1 bg-indigo-500/80 rounded-full mb-2"></div>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -1456,13 +1465,14 @@ const App: React.FC = () => {
                                             className="w-full h-full object-cover"
                                             style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                             />
-                                            <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rotate-[-2deg]">
-                                            <h2
-                                                className="text-4xl md:text-6xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep"
-                                                style={{ textShadow: '2px 2px 0px #e2e8f0' }}
-                                            >
-                                                {storyboard.title}
-                                            </h2>
+                                            <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex flex-col justify-end items-center text-center min-h-[40%]">
+                                                <h2
+                                                    className="text-4xl md:text-6xl font-bold text-white font-serif tracking-tight leading-tight drop-shadow-lg break-keep mb-2"
+                                                    style={{ textShadow: '0 2px 10px rgba(0,0,0,0.8)' }}
+                                                >
+                                                    {storyboard.title}
+                                                </h2>
+                                                <div className="w-12 h-1 bg-indigo-500/80 rounded-full mb-2"></div>
                                             </div>
                                         </div>
                                     ) : (
