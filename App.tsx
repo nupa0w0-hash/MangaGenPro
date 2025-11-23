@@ -191,7 +191,7 @@ const App: React.FC = () => {
       if (!storyboard) return;
 
       const canvasWidth = 800;
-      const gap = 16;
+      const gap = 24; // Increased gap/margin to prevent overflow
       const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
 
       let colHeights = [gap, gap]; // y-offset for col 0 and col 1
@@ -275,7 +275,7 @@ const App: React.FC = () => {
 
       // Let's construct fully here to be safe
       const canvasWidth = 800;
-      const gap = 16;
+      const gap = 24; // Increased gap
       const colWidth = (canvasWidth - gap * 3) / 2;
       let colHeights = [gap, gap];
 
@@ -1319,8 +1319,11 @@ const App: React.FC = () => {
                                                     className="w-full h-full object-cover"
                                                     style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                                     />
-                                                    <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                                                    <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
+                                                    <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rotate-[-2deg]">
+                                                    <h2
+                                                        className="text-4xl md:text-6xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep"
+                                                        style={{ textShadow: '2px 2px 0px #e2e8f0' }}
+                                                    >
                                                         {storyboard.title}
                                                     </h2>
                                                     </div>
@@ -1445,8 +1448,11 @@ const App: React.FC = () => {
                                             className="w-full h-full object-cover"
                                             style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
                                             />
-                                            <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                                            <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
+                                            <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rotate-[-2deg]">
+                                            <h2
+                                                className="text-4xl md:text-6xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep"
+                                                style={{ textShadow: '2px 2px 0px #e2e8f0' }}
+                                            >
                                                 {storyboard.title}
                                             </h2>
                                             </div>
