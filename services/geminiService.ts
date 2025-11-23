@@ -118,7 +118,7 @@ export const generateStoryboard = async (
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            title: { type: Type.STRING, description: "만화 제목" },
+            title: { type: Type.STRING, description: "A Creative and Impactful Title for the Manga (Korean)" },
             coverImagePrompt: { type: Type.STRING, description: "표지 프롬프트" },
             panels: {
               type: Type.ARRAY,

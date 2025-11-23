@@ -134,18 +134,43 @@ const App: React.FC = () => {
   // ------------------------------------------------------------------
   // Layout Management & Initialization
   // ------------------------------------------------------------------
+  const [containerHeight, setContainerHeight] = useState<number>(1200);
+
   useEffect(() => {
       if (activeTab !== 'result' || !storyboard || pageTemplate !== 'dynamic') return;
 
       // Check if layout needs initialization (or re-sync)
       // We force re-sync if layout is missing OR if panelSize changed significantly?
       // For now, just ensure every panel has a layout.
-      const needsInit = storyboard.panels.some(p => !p.layout);
+      const needsInit = storyboard.panels.some(p => !p.layout) || (storyboard.coverImagePrompt && !storyboard.coverLayout);
 
       if (needsInit) {
           initializeLayouts();
       }
+
+      recalcContainerHeight();
   }, [activeTab, storyboard?.panels?.length, pageTemplate]);
+
+  const recalcContainerHeight = () => {
+      if (!storyboard) return;
+      let maxY = 0;
+
+      // Check Panels
+      storyboard.panels.forEach(p => {
+          if (p.layout) {
+              const bottom = p.layout.y + (typeof p.layout.height === 'number' ? p.layout.height : parseInt(String(p.layout.height)));
+              if (bottom > maxY) maxY = bottom;
+          }
+      });
+
+      // Check Cover
+      if (storyboard.coverLayout) {
+          const bottom = storyboard.coverLayout.y + (typeof storyboard.coverLayout.height === 'number' ? storyboard.coverLayout.height : parseInt(String(storyboard.coverLayout.height)));
+          if (bottom > maxY) maxY = bottom;
+      }
+
+      setContainerHeight(Math.max(1200, maxY + 200));
+  };
 
   const initializeLayouts = () => {
       if (!storyboard) return;
@@ -155,6 +180,26 @@ const App: React.FC = () => {
       const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
 
       let colHeights = [gap, gap]; // y-offset for col 0 and col 1
+
+      // 1. Initialize Cover if exists
+      let newCoverLayout = storyboard.coverLayout;
+      if ((storyboard.coverImagePrompt || storyboard.coverImageUrl) && !newCoverLayout) {
+          // Default cover at top
+          newCoverLayout = {
+              x: gap,
+              y: gap,
+              width: canvasWidth - (gap * 2), // Full width
+              height: storyboard.coverAspectRatio === 'landscape'
+                ? (canvasWidth - gap*2) * 0.56
+                : (canvasWidth - gap*2) * 1.33,
+              zIndex: 0
+          };
+
+          // Push columns down
+          const coverHeight = typeof newCoverLayout.height === 'number' ? newCoverLayout.height : 400;
+          colHeights[0] += coverHeight + gap;
+          colHeights[1] += coverHeight + gap;
+      }
 
       const newPanels = storyboard.panels.map((panel, idx) => {
           // If already has layout, keep it (unless we want to force reset?)
@@ -204,24 +249,37 @@ const App: React.FC = () => {
           };
       });
 
-      setStoryboard(prev => prev ? { ...prev, panels: newPanels } : null);
+      setStoryboard(prev => prev ? { ...prev, panels: newPanels, coverLayout: newCoverLayout } : null);
   };
 
   const resetLayouts = () => {
       if (!storyboard) return;
       // Clear layouts and re-run initialization
       const clearedPanels = storyboard.panels.map(p => ({ ...p, layout: undefined }));
-      setStoryboard({ ...storyboard, panels: clearedPanels });
-      // The useEffect will trigger initializeLayouts automatically on next render
-      // but state update is async, so we might want to call it manually or wait.
-      // Actually, setting layout undefined works if we call init immediately with the new state,
-      // but easier to just let effect handle it or construct new state fully here.
+      setStoryboard({ ...storyboard, panels: clearedPanels, coverLayout: undefined });
 
       // Let's construct fully here to be safe
       const canvasWidth = 800;
       const gap = 16;
       const colWidth = (canvasWidth - gap * 3) / 2;
       let colHeights = [gap, gap];
+
+      // 1. Cover
+      let newCoverLayout;
+      if (storyboard.coverImagePrompt || storyboard.coverImageUrl) {
+          newCoverLayout = {
+              x: gap,
+              y: gap,
+              width: canvasWidth - (gap * 2),
+              height: storyboard.coverAspectRatio === 'landscape'
+                ? (canvasWidth - gap*2) * 0.56
+                : (canvasWidth - gap*2) * 1.33,
+              zIndex: 0
+          };
+          const ch = typeof newCoverLayout.height === 'number' ? newCoverLayout.height : 400;
+          colHeights[0] += ch + gap;
+          colHeights[1] += ch + gap;
+      }
 
       const newPanels = clearedPanels.map((panel, idx) => {
           let w = colWidth;
@@ -257,7 +315,7 @@ const App: React.FC = () => {
           };
       });
 
-      setStoryboard({ ...storyboard, panels: newPanels });
+      setStoryboard({ ...storyboard, panels: newPanels, coverLayout: newCoverLayout });
   };
 
   // ... (rest of functions)
@@ -484,7 +542,7 @@ const App: React.FC = () => {
         const canvas = await html2canvas(resultRef.current, {
             scale: 2,
             useCORS: true,
-            allowTaint: true,
+            allowTaint: false,
             backgroundColor: null
         });
 
@@ -546,16 +604,43 @@ const App: React.FC = () => {
   const layoutPanels = calculateStrictLayout();
 
   // Handlers for Rnd
+  const calculateMaxHeight = (panels: Panel[], coverLayout?: LayoutState) => {
+      let maxY = 0;
+      panels.forEach(p => {
+          if (p.layout) {
+              const bottom = p.layout.y + (typeof p.layout.height === 'number' ? p.layout.height : parseInt(String(p.layout.height)));
+              if (bottom > maxY) maxY = bottom;
+          }
+      });
+      if (coverLayout) {
+          const bottom = coverLayout.y + (typeof coverLayout.height === 'number' ? coverLayout.height : parseInt(String(coverLayout.height)));
+          if (bottom > maxY) maxY = bottom;
+      }
+      return Math.max(1200, maxY + 200);
+  };
+
   const updatePanelLayout = (index: number, newLayout: Partial<LayoutState>) => {
       if (!storyboard) return;
       const newPanels = [...storyboard.panels];
       const current = newPanels[index].layout || { x: 0, y: 0, width: 300, height: 300, zIndex: 1 };
 
-      newPanels[index] = {
+      const updatedPanel = {
           ...newPanels[index],
           layout: { ...current, ...newLayout }
       };
+      newPanels[index] = updatedPanel;
+
       setStoryboard({ ...storyboard, panels: newPanels });
+      setContainerHeight(calculateMaxHeight(newPanels, storyboard.coverLayout));
+  };
+
+  const updateCoverLayout = (newLayout: Partial<LayoutState>) => {
+      if (!storyboard) return;
+      const current = storyboard.coverLayout || { x: 0, y: 0, width: 800, height: 600, zIndex: 0 };
+      const updatedCoverLayout = { ...current, ...newLayout };
+
+      setStoryboard({ ...storyboard, coverLayout: updatedCoverLayout });
+      setContainerHeight(calculateMaxHeight(storyboard.panels, updatedCoverLayout));
   };
 
   const bringToFront = (index: number) => {
@@ -1144,43 +1229,77 @@ const App: React.FC = () => {
               {/* Canvas Container */}
               <div className="w-full px-4 md:px-8 pb-40 flex justify-center">
                   <div className="w-full max-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
-                      <div ref={resultRef} className={`w-full bg-white mx-auto p-4 md:p-8 box-border min-h-[1200px] relative ${pageTemplate === 'webtoon' ? 'pb-20' : ''}`}>
+                      {/* Note: We force min-height based on calculation to allow scrolling */}
+                      <div
+                         ref={resultRef}
+                         className={`w-full bg-white mx-auto p-4 md:p-8 box-border relative transition-all duration-300 ease-out`}
+                         style={{ height: pageTemplate === 'dynamic' ? containerHeight : 'auto', minHeight: '1200px' }}
+                      >
                         
-                        {/* Cover */}
-                        {(storyboard.coverImagePrompt || storyboard.coverImageUrl) && (
-                            <div className="mb-16 w-full relative">
-                            {storyboard.coverImageUrl ? (
-                                <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} relative overflow-hidden border-[4px] border-black shadow-lg`}>
-                                    <img 
-                                    src={storyboard.coverImageUrl} 
-                                    alt="Cover" 
-                                    className="w-full h-full object-cover"
-                                    style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
-                                    />
-                                    <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-                                    <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
-                                        {storyboard.title}
-                                    </h2>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
-                                    {generatingCover ? (
-                                        <>
-                                            <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
-                                            <span className="font-comic text-gray-500 animate-pulse">Drawing Cover...</span>
-                                        </>
-                                    ) : (
-                                        <h1 className="font-manga text-4xl text-black text-center px-4">{storyboard.title}</h1>
-                                    )}
-                                </div>
-                            )}
-                            </div>
-                        )}
-
-                        {/* Manga Grid / Canvas */}
+                        {/* Render Cover & Panels */}
                         {pageTemplate === 'dynamic' ? (
-                            <div className="relative w-full h-full min-h-[800px]">
+                            <div className="relative w-full h-full">
+                                {/* Cover (Draggable) */}
+                                {(storyboard.coverImagePrompt || storyboard.coverImageUrl) && (
+                                    <Rnd
+                                        size={{
+                                            width: storyboard.coverLayout?.width || 736,
+                                            height: storyboard.coverLayout?.height || 400
+                                        }}
+                                        position={{
+                                            x: storyboard.coverLayout?.x || 16,
+                                            y: storyboard.coverLayout?.y || 16
+                                        }}
+                                        onDragStop={(_e, d) => updateCoverLayout({ x: d.x, y: d.y })}
+                                        onResizeStop={(_e, _direction, ref, _delta, position) => {
+                                            updateCoverLayout({
+                                                width: ref.style.width,
+                                                height: ref.style.height,
+                                                ...position,
+                                            });
+                                        }}
+                                        bounds="parent"
+                                        className="group/cover-container"
+                                        dragHandleClassName="drag-handle-cover"
+                                        style={{ zIndex: storyboard.coverLayout?.zIndex || 0 }}
+                                    >
+                                        <div className="w-full h-full relative group cursor-move drag-handle-cover">
+                                            {storyboard.coverImageUrl ? (
+                                                <div className={`w-full h-full relative overflow-hidden border-[4px] border-black shadow-lg`}>
+                                                    <img
+                                                    src={storyboard.coverImageUrl}
+                                                    alt="Cover"
+                                                    className="w-full h-full object-cover"
+                                                    style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
+                                                    />
+                                                    <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                                                    <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
+                                                        {storyboard.title}
+                                                    </h2>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className={`w-full h-full border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
+                                                    {generatingCover ? (
+                                                        <>
+                                                            <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                                            <span className="font-comic text-gray-500 animate-pulse">Drawing Cover...</span>
+                                                        </>
+                                                    ) : (
+                                                        <h1 className="font-manga text-4xl text-black text-center px-4">{storyboard.title}</h1>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Hover Frame to indicate draggable */}
+                                            <div className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none" />
+                                            <div className="absolute top-2 right-2 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                                Cover (Drag/Resize)
+                                            </div>
+                                        </div>
+                                    </Rnd>
+                                )}
+
                                 {storyboard.panels.map((panel, idx) => (
                                     <Rnd
                                         key={panel.id}
@@ -1254,6 +1373,38 @@ const App: React.FC = () => {
                             </div>
                         ) : (
                             <div className="w-full flex flex-col gap-4">
+                                {/* Cover (Static for non-dynamic) */}
+                                {(storyboard.coverImagePrompt || storyboard.coverImageUrl) && (
+                                    <div className="mb-16 w-full relative">
+                                    {storyboard.coverImageUrl ? (
+                                        <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} relative overflow-hidden border-[4px] border-black shadow-lg`}>
+                                            <img
+                                            src={storyboard.coverImageUrl}
+                                            alt="Cover"
+                                            className="w-full h-full object-cover"
+                                            style={storyboard.styleMode === 'bw' ? { filter: 'grayscale(100%) contrast(1.15) brightness(1.05)' } : {}}
+                                            />
+                                            <div className="absolute bottom-6 right-6 max-w-[70%] bg-white px-6 py-4 border-[3px] border-black shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                                            <h2 className="text-3xl md:text-5xl font-black text-black font-manga tracking-tighter uppercase leading-none break-keep">
+                                                {storyboard.title}
+                                            </h2>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} border-[4px] border-black flex flex-col items-center justify-center bg-gray-50 gap-4`}>
+                                            {generatingCover ? (
+                                                <>
+                                                    <Loader2 className="w-10 h-10 animate-spin text-gray-400" />
+                                                    <span className="font-comic text-gray-500 animate-pulse">Drawing Cover...</span>
+                                                </>
+                                            ) : (
+                                                <h1 className="font-manga text-4xl text-black text-center px-4">{storyboard.title}</h1>
+                                            )}
+                                        </div>
+                                    )}
+                                    </div>
+                                )}
+
                                 {layoutPanels.map((panel) => (
                                     <div
                                       key={panel.id}
