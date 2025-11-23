@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import html2canvas from 'html2canvas';
 import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode, LayoutState } from './types';
 import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
@@ -281,6 +282,36 @@ const App: React.FC = () => {
     alert('스토리가 저장되었습니다.');
   };
 
+  const loadAutosave = () => {
+    const autosave = localStorage.getItem('mangaGen_autosave');
+    if (!autosave) {
+        alert("자동 저장된 데이터가 없습니다.");
+        return;
+    }
+
+    if (confirm("자동 저장된 내용을 불러오시겠습니까? 현재 작업 중인 내용은 사라질 수 있습니다.")) {
+        try {
+            const data = JSON.parse(autosave);
+            if (data.storyLog) setStoryLog(data.storyLog);
+            if (data.characters) setCharacters(data.characters || []);
+            if (data.storyboard) setStoryboard(data.storyboard);
+            if (data.styleMode) setStyleMode(data.styleMode);
+            if (data.renderMode) setRenderMode(data.renderMode);
+            if (data.coverRatio) setCoverRatio(data.coverRatio);
+            if (data.pageTemplate) setPageTemplate(data.pageTemplate);
+
+            // Set active tab based on data presence
+            if (data.storyboard) setActiveTab('preview');
+            else setActiveTab('input');
+
+            alert("불러오기 완료");
+        } catch(e) {
+            console.error("Autosave load failed", e);
+            alert("데이터를 불러오는 중 오류가 발생했습니다.");
+        }
+    }
+  };
+
   const loadBookmark = (bm: Bookmark) => {
     if (confirm('현재 작업 중인 내용이 덮어씌워집니다. 불러오시겠습니까?')) {
         setStoryLog(bm.storyLog);
@@ -445,6 +476,27 @@ const App: React.FC = () => {
         return false;
      }
   }, []);
+
+  const handleDownload = async () => {
+    if (!resultRef.current || !storyboard) return;
+
+    try {
+        const canvas = await html2canvas(resultRef.current, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null
+        });
+
+        const link = document.createElement('a');
+        link.download = `${storyboard.title || 'manga-result'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    } catch (e) {
+        console.error("Export failed", e);
+        alert("이미지 저장에 실패했습니다.");
+    }
+  };
 
   const handleStartDrawing = async () => {
     if (!storyboard) return;
