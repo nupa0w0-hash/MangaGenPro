@@ -11,13 +11,31 @@ export interface Dialogue {
   type: 'speech' | 'shout' | 'thought' | 'narration';
 }
 
+export interface LayoutState {
+  x: number;
+  y: number;
+  width: number | string;
+  height: number | string;
+  zIndex: number;
+}
+
 export interface Panel {
   id: number;
   description: string; // Korean description for display
   visualPromptEn: string; // English visual prompt for the image generator
+
+  // New fields for stricter control
+  location?: string; // e.g. "Classroom", "Space Station"
+  time?: string; // e.g. "Night", "Sunset"
+  costumeOverride?: string; // Empty unless explicitly changed in story
+
   dialogues: Dialogue[]; // List of dialogues
   charactersInPanel: string[]; // Names of characters in this panel
   panelSize: 'square' | 'wide' | 'tall'; // Layout hint
+
+  // Free form layout state
+  layout?: LayoutState;
+
   imageUrl?: string; // The generated image URL
   status: 'pending' | 'generating' | 'completed' | 'failed';
 }
