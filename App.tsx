@@ -135,6 +135,23 @@ const App: React.FC = () => {
   // Layout Management & Initialization
   // ------------------------------------------------------------------
   const [containerHeight, setContainerHeight] = useState<number>(1200);
+  const [scale, setScale] = useState(1);
+
+  // Responsive Scale Handler
+  useEffect(() => {
+      const handleResize = () => {
+          if (activeTab === 'result') {
+              const availableWidth = window.innerWidth - 32; // 32px padding
+              const newScale = Math.min(1, availableWidth / 800);
+              setScale(newScale);
+          }
+      };
+
+      window.addEventListener('resize', handleResize);
+      handleResize(); // Init
+
+      return () => window.removeEventListener('resize', handleResize);
+  }, [activeTab]);
 
   useEffect(() => {
       if (activeTab !== 'result' || !storyboard || pageTemplate !== 'dynamic') return;
@@ -1227,8 +1244,19 @@ const App: React.FC = () => {
               </div>
 
               {/* Canvas Container */}
-              <div className="w-full px-4 md:px-8 pb-40 flex justify-center overflow-x-auto">
-                  <div className="w-[800px] min-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
+              <div className="w-full px-4 md:px-8 pb-40 flex justify-center overflow-x-hidden">
+                  {/* Scaled Wrapper: Adjusts width/height to fit screen while keeping internal 800px layout */}
+                  <div
+                    className="relative transition-transform duration-200 ease-out origin-top"
+                    style={{
+                        width: 800 * scale,
+                        height: (pageTemplate === 'dynamic' ? containerHeight : 2000) * scale // Approx height for non-dynamic
+                    }}
+                  >
+                    <div
+                        className="w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300 origin-top-left absolute top-0 left-0"
+                        style={{ transform: `scale(${scale})` }}
+                    >
                       {/* Note: We force min-height based on calculation to allow scrolling */}
                       <div
                          ref={resultRef}
@@ -1258,6 +1286,7 @@ const App: React.FC = () => {
                                                 ...position,
                                             });
                                         }}
+                                        scale={scale}
                                         bounds="parent"
                                         className="group/cover-container"
                                         dragHandleClassName="drag-handle-cover"
@@ -1321,6 +1350,7 @@ const App: React.FC = () => {
                                         }}
                                         onMouseDown={() => bringToFront(idx)}
                                         style={{ zIndex: panel.layout?.zIndex || 1 }}
+                                        scale={scale}
                                         bounds="parent"
                                         className="group/panel-container"
                                         enableUserSelectHack={false}
@@ -1427,6 +1457,7 @@ const App: React.FC = () => {
                         </div>
                       </div>
                   </div>
+                </div>
               </div>
             </div>
           )}
