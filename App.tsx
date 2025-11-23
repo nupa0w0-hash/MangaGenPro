@@ -1227,8 +1227,8 @@ const App: React.FC = () => {
               </div>
 
               {/* Canvas Container */}
-              <div className="w-full px-4 md:px-8 pb-40 flex justify-center">
-                  <div className="w-full max-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
+              <div className="w-full px-4 md:px-8 pb-40 flex justify-center overflow-x-auto">
+                  <div className="w-[800px] min-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
                       {/* Note: We force min-height based on calculation to allow scrolling */}
                       <div
                          ref={resultRef}
