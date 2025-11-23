@@ -10,7 +10,7 @@ import {
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
-  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key
+  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -593,17 +593,49 @@ const App: React.FC = () => {
     if (!resultRef.current || !storyboard) return;
 
     try {
-        const canvas = await html2canvas(resultRef.current, {
+        // Create a temporary container for export to ensure 800px fixed layout regardless of screen size
+        const exportContainer = document.createElement('div');
+        exportContainer.style.width = '800px';
+        exportContainer.style.height = 'auto';
+        exportContainer.style.position = 'absolute';
+        exportContainer.style.top = '-9999px';
+        exportContainer.style.left = '-9999px';
+        exportContainer.style.zIndex = '-1';
+        exportContainer.style.backgroundColor = theme === 'dark' ? '#020617' : '#ffffff'; // Match bg
+        document.body.appendChild(exportContainer);
+
+        // Clone the result content
+        const clone = resultRef.current.cloneNode(true) as HTMLElement;
+
+        // Remove any transform scales from the clone (though resultRef shouldn't have them,
+        // its parent does. We are capturing the inner content purely)
+        clone.style.transform = 'none';
+        clone.style.minHeight = 'auto';
+        clone.style.height = 'auto';
+
+        exportContainer.appendChild(clone);
+
+        // Wait for images to be "ready" in the new DOM context
+        // (They should be cached, but a small delay helps html2canvas catch up)
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const canvas = await html2canvas(clone, {
             scale: 2,
             useCORS: true,
             allowTaint: false,
-            backgroundColor: null
+            backgroundColor: null,
+            width: 800, // Force width
+            windowWidth: 800, // Force window width context
         });
 
         const link = document.createElement('a');
         link.download = `${storyboard.title || 'manga-result'}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
+
+        // Cleanup
+        document.body.removeChild(exportContainer);
+
     } catch (e) {
         console.error("Export failed", e);
         alert("이미지 저장에 실패했습니다.");
@@ -1403,6 +1435,14 @@ const App: React.FC = () => {
 
                                             {/* Resize Handle Visual */}
                                             <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50" />
+
+                                            {/* Move Indicator (Top Center) */}
+                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none">
+                                                <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
+                                                    <Move className="w-3 h-3" />
+                                                    <span className="font-bold">Drag to Move</span>
+                                                </div>
+                                            </div>
 
                                             {/* Size Presets (Floating) */}
                                             <div className="absolute top-2 left-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
