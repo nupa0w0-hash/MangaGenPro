@@ -82,20 +82,26 @@ export const generateStoryboard = async (
     [절대 규칙]
     1. **캐릭터 이름 유지:** 캐릭터의 이름은 등록된 목록의 텍스트(한국어/영어 등)를 **글자 그대로(EXACTLY)** 사용해야 합니다.
     2. **배경 필수 (Background Mandatory):** 모든 컷에는 구체적인 배경 묘사가 필수입니다. 절대 "배경 없음"이나 "흰색 배경"을 만들지 마세요. 장소(교실, 거리, 우주선 등)를 반드시 묘사하세요.
-    3. **의상 및 스타일 유연성:** 스토리 로그에 캐릭터의 의상이나 헤어스타일 변경에 대한 언급이 있다면 반드시 반영하세요. 그러나 언급이 없다면 과도하게 강제하지 말고, 해당 장르(학교, 판타지 등)에 어울리는 자연스러운 복장을 유지하거나 기본 외형을 따르세요.
+    3. **의상 및 헤어스타일 엄격 유지:**
+       - 스토리 로그에 의상이나 헤어스타일 변경에 대한 명확한 언급(예: "코트를 입는다", "머리를 묶는다")이 **없다면**, 절대 임의로 의상이나 헤어스타일을 묘사하지 마세요.
+       - 의상/헤어 변경이 없는 경우 \`costumeOverride\` 필드를 반드시 비워두세요(null/empty).
     
     [지시사항]
     1. 스토리를 6~10컷의 역동적인 만화 패널로 구성하세요.
     2. **${styleInstruction}**의 연출을 사용하세요.
-    3. **Visual Prompt Detail:** visualPromptEn은 AI가 이미지를 생성하는 유일한 정보입니다. 조명, 앵글, 배경 디테일, 분위기를 포함해 50단어 이상으로 아주 자세히 쓰세요.
+    3. **Visual Prompt Detail:** visualPromptEn은 AI가 이미지를 생성하는 정보입니다.
+       - **주의:** 의상이나 헤어스타일 묘사는 \`costumeOverride\` 필드에만 작성하고, \`visualPromptEn\`에는 구도, 조명, 표정, 배경, 액션 위주로 작성하세요.
     4. 표지(Cover) 프롬프트 작성: 제목과 어울리는 임팩트 있는 표지 일러스트 프롬프트를 작성하세요.
     
     각 패널 출력 항목:
        - description: (한국어) 현재 상황 설명.
-       - visualPromptEn: (영어) 이미지 생성 AI를 위한 **초고해상도 묘사**. 
-         * 필수: 구체적 배경 (Background), 시간대 (Time), 조명 (Lighting), 카메라 앵글 (Low angle, Fish-eye, Close-up).
+       - location: (영어) 장소 (예: Classroom, Street).
+       - time: (영어) 시간대 (예: Night, Sunset).
+       - costumeOverride: (영어) **스토리 로그에 명시된 경우에만** 작성. 없으면 빈 문자열.
+       - visualPromptEn: (영어) 이미지 생성 AI를 위한 묘사 (액션, 구도, 표정 등). 의상 묘사 제외.
+         * 필수: 구체적 배경 (Background), 조명 (Lighting), 카메라 앵글 (Low angle, Fish-eye, Close-up).
          * 스타일: "${styleInstruction}".
-       - dialogues: (Array) 대사 목록. 각 대사는 화자(speaker), 내용(text), 타입(type)을 포함.
+       - dialogues: (Array) 대사 목록.
        - panelSize: 'square', 'wide', 'tall'.
        - charactersInPanel: 해당 컷에 등장하는 캐릭터 이름 배열.
     
@@ -107,21 +113,24 @@ export const generateStoryboard = async (
       model: STORY_MODEL,
       contents: prompt,
       config: {
-        systemInstruction: "You are a manga director. You provide EXTREMELY DETAILED visual prompts for AI image generation. You NEVER change character names provided by the user. You ALWAYS include detailed background descriptions.",
+        systemInstruction: "You are a manga director. You provide EXTREMELY DETAILED visual prompts. You NEVER change character names. You NEVER hallucinate costume changes unless explicitly in the story.",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             title: { type: Type.STRING, description: "만화 제목" },
-            coverImagePrompt: { type: Type.STRING, description: "표지를 위한 매우 상세한 영어 시각적 프롬프트" },
+            coverImagePrompt: { type: Type.STRING, description: "표지 프롬프트" },
             panels: {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
                 properties: {
                   id: { type: Type.INTEGER },
-                  description: { type: Type.STRING, description: "한국어 장면 설명" },
-                  visualPromptEn: { type: Type.STRING, description: "영어 이미지 생성 프롬프트 (50단어 이상, 배경 필수 포함)" },
+                  description: { type: Type.STRING },
+                  location: { type: Type.STRING },
+                  time: { type: Type.STRING },
+                  costumeOverride: { type: Type.STRING, description: "Leave empty if not changed in story" },
+                  visualPromptEn: { type: Type.STRING, description: "Visual description excluding costume unless changed" },
                   dialogues: {
                     type: Type.ARRAY,
                     items: {
@@ -200,8 +209,9 @@ export const regeneratePanelScript = async (
     
     요청: 위 패널의 내용을 기반으로 하되, 더 극적이거나 자연스러운 연출로 **새롭게** 다시 작성해주세요.
     **배경(Background)**은 필수입니다. 절대 비워두지 마세요.
-    구도는 바꾸거나 유지할 수 있습니다. 
-    스타일 지침: ${styleInstruction}
+
+    [중요: 의상 유지]
+    - 스토리상 의상 변경이 없다면 costumeOverride는 비워두세요.
     
     출력 형식: JSON (단일 Panel 객체)
   `;
@@ -217,6 +227,9 @@ export const regeneratePanelScript = async (
             properties: {
                 id: { type: Type.INTEGER },
                 description: { type: Type.STRING },
+                location: { type: Type.STRING },
+                time: { type: Type.STRING },
+                costumeOverride: { type: Type.STRING },
                 visualPromptEn: { type: Type.STRING },
                 dialogues: {
                 type: Type.ARRAY,
@@ -247,12 +260,11 @@ export const regeneratePanelScript = async (
      const jsonString = text.replace(/```json\n?|```/g, "");
      const newPanelData = JSON.parse(jsonString);
 
-     // Maintain status/id from original unless changed by AI (AI keeps ID usually)
      return {
          ...newPanelData,
          id: panel.id,
          status: 'pending',
-         imageUrl: undefined // Reset image since script changed
+         imageUrl: undefined
      };
 
   } catch (error) {
@@ -368,14 +380,30 @@ export const generatePanelImage = async (
       dialoguePrompt += "\nEnsure the speech bubbles are placed naturally near the speakers and text is legible.";
   }
 
+  // Construct Location/Time/Costume Prompt
+  const locationInfo = panel.location ? `Location: ${panel.location}.` : "";
+  const timeInfo = panel.time ? `Time: ${panel.time}.` : "";
+
+  // Only add costume prompt if override exists. Otherwise, emphasize strict adherence to reference.
+  let costumePrompt = "";
+  if (panel.costumeOverride && panel.costumeOverride.trim().length > 0) {
+      costumePrompt = `Costume Change: ${panel.costumeOverride}.`;
+  } else {
+      costumePrompt = "Costume: Use EXACTLY the appearance from the Character Reference images. Do NOT add hats, coats, or accessories unless in reference.";
+  }
+
   // 2. Main Prompt
   const mainPrompt = `
     ${stylePrompt}
     
     IMPORTANT: FULLY DETAILED BACKGROUND REQUIRED. NO WHITE VOID.
-    Scene Description: ${panel.visualPromptEn}
+    ${locationInfo} ${timeInfo}
+
+    Scene Action: ${panel.visualPromptEn}
     
     Characters: ${panel.charactersInPanel.join(", ")}.
+    ${costumePrompt}
+
     Composition: Dynamic manga composition. 
     ${renderMode === 'native' && hasDialogue
        ? `INCLUDE TEXT AND SPEECH BUBBLES based on the dialogue provided below. ${dialoguePrompt}`

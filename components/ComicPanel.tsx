@@ -11,6 +11,7 @@ interface Props {
 
 const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay' }) => {
   // Determine aspect ratio styles based on panelSize
+  // Ensure the container matches the generated image's aspect ratio
   const aspectRatioClass = 
     panel.panelSize === 'wide' ? 'aspect-[16/9]' : 
     panel.panelSize === 'tall' ? 'aspect-[3/4]' : 

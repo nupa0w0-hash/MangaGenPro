@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode } from './types';
+import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode, LayoutState } from './types';
 import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
+import { Rnd } from 'react-rnd';
 
 import { 
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
@@ -350,12 +351,85 @@ const App: React.FC = () => {
       finally { setGeneratingCover(false); }
     }
 
+    // Initialize layouts for Free Canvas if needed
+    // Simple logic: if missing layout, assign default grid positions
+    const canvasWidth = 800; // Approximate width of result container
+    const gap = 16;
+    const colWidth = (canvasWidth - gap * 3) / 2;
+
+    // Create a deep copy to avoid mutating state directly before set
+    const updatedPanels = storyboard.panels.map((panel, idx) => {
+       if (panel.layout) return panel;
+
+       // Calculate simple grid position
+       const col = idx % 2;
+       const row = Math.floor(idx / 2);
+
+       // Default sizes based on panelSize preference
+       let width: number = colWidth;
+       let height: number = colWidth; // Square by default
+
+       if (panel.panelSize === 'wide') {
+           width = colWidth * 2 + gap; // Span full width? Or just wider?
+           // If spanning full width, we need to adjust subsequent items, but for simplicity
+           // let's just make it 2 columns wide if it fits, otherwise normal.
+           // Actually, let's just stick to the simple 2-column grid initial placement
+           // regardless of preference, users can resize.
+           // Or better: mimic the visual size
+       }
+
+       if (panel.panelSize === 'tall') height = colWidth * 1.5;
+       if (panel.panelSize === 'wide') width = colWidth; // Keep it in column for now, user can stretch
+
+       // Naive Grid Calculation
+       const x = gap + (col * (colWidth + gap));
+       const y = gap + (row * (colWidth + gap)); // Rough estimation, rows overlap if heights differ
+
+       // Better approach: track Y per column
+       // But we are inside a map. We'll do a second pass or just use rough grid.
+       // Let's effectively just stack them for safety if initializing.
+
+       return {
+           ...panel,
+           layout: {
+               x: x,
+               y: y, // This will overlap rows heavily if we don't track heights.
+               width: colWidth,
+               height: panel.panelSize === 'tall' ? colWidth * 1.3 : (panel.panelSize === 'wide' ? colWidth * 0.7 : colWidth),
+               zIndex: idx + 1
+           }
+       };
+    });
+
+    // Improved layout initialization (Waterfall)
+    if (updatedPanels.some(p => !storyboard.panels.find(op => op.id === p.id)?.layout)) {
+        let colHeights = [gap, gap]; // Top offsets for 2 columns
+        updatedPanels.forEach((panel, idx) => {
+            if (storyboard.panels[idx].layout) return; // Already has layout
+
+            const colIndex = colHeights[0] <= colHeights[1] ? 0 : 1;
+            const x = gap + (colIndex * (colWidth + gap));
+            const y = colHeights[colIndex];
+
+            // Default dimensions
+            const w = colWidth;
+            const h = panel.panelSize === 'tall' ? w * 1.4 : (panel.panelSize === 'wide' ? w * 0.6 : w);
+
+            panel.layout = { x, y, width: w, height: h, zIndex: idx + 1 };
+
+            colHeights[colIndex] += h + gap;
+        });
+
+        setStoryboard(prev => prev ? { ...prev, panels: updatedPanels } : null);
+    }
+
     setCurrentPanelIndex(0);
-    const panels = storyboard.panels;
-    for (let i = 0; i < panels.length; i++) {
+    // Use the possibly updated panels
+    const panelsToGen = updatedPanels;
+    for (let i = 0; i < panelsToGen.length; i++) {
        setCurrentPanelIndex(i);
-       if (panels[i].status !== 'completed') {
-          await generateSinglePanel(panels[i], characters, currentStyle, currentRenderMode);
+       if (panelsToGen[i].status !== 'completed') {
+          await generateSinglePanel(panelsToGen[i], characters, currentStyle, currentRenderMode);
        }
     }
     setCurrentPanelIndex(-1);
@@ -442,7 +516,35 @@ const App: React.FC = () => {
     }
     return layoutPanels;
   };
+
+  // Only use strict layout if NOT dynamic (or if we want to force it)
+  // But for Dynamic, we now want Free Canvas.
+  // We'll keep this for 'webtoon'/'four_koma' logic if needed, but primarily iterate on panels directly.
   const layoutPanels = calculateStrictLayout();
+
+  // Handlers for Rnd
+  const updatePanelLayout = (index: number, newLayout: Partial<LayoutState>) => {
+      if (!storyboard) return;
+      const newPanels = [...storyboard.panels];
+      const current = newPanels[index].layout || { x: 0, y: 0, width: 300, height: 300, zIndex: 1 };
+
+      newPanels[index] = {
+          ...newPanels[index],
+          layout: { ...current, ...newLayout }
+      };
+      setStoryboard({ ...storyboard, panels: newPanels });
+  };
+
+  const bringToFront = (index: number) => {
+      if (!storyboard) return;
+      const newPanels = [...storyboard.panels];
+      // Find max zIndex
+      const maxZ = Math.max(...newPanels.map(p => p.layout?.zIndex || 0), 0);
+      if (newPanels[index].layout) {
+          newPanels[index].layout = { ...newPanels[index].layout!, zIndex: maxZ + 1 };
+          setStoryboard({ ...storyboard, panels: newPanels });
+      }
+  };
 
   // --------------------------------------------------------------------------------
   // 🔑 API Key Input Screen (Inline)
@@ -794,6 +896,42 @@ const App: React.FC = () => {
                           
                           {/* Left Col: Visuals (7/12) */}
                           <div className="xl:col-span-7 space-y-5">
+                             {/* NEW: Explicit fields for stricter control */}
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div>
+                                     <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-1">Location</label>
+                                     <input
+                                         type="text"
+                                         value={panel.location || ''}
+                                         onChange={(e) => handleUpdatePanel(index, 'location', e.target.value)}
+                                         placeholder="e.g. Classroom"
+                                         className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm"
+                                     />
+                                 </div>
+                                 <div>
+                                     <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase mb-1">Time</label>
+                                     <input
+                                         type="text"
+                                         value={panel.time || ''}
+                                         onChange={(e) => handleUpdatePanel(index, 'time', e.target.value)}
+                                         placeholder="e.g. Afternoon"
+                                         className="w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm"
+                                     />
+                                 </div>
+                             </div>
+                             <div>
+                                 <label className="flex items-center gap-2 text-xs font-bold text-orange-500 uppercase mb-1">
+                                    Costume Override <span className="text-[10px] font-normal text-slate-400">(Optional)</span>
+                                 </label>
+                                 <input
+                                     type="text"
+                                     value={panel.costumeOverride || ''}
+                                     onChange={(e) => handleUpdatePanel(index, 'costumeOverride', e.target.value)}
+                                     placeholder="Leave empty to use Character Reference"
+                                     className="w-full bg-orange-50/50 dark:bg-slate-950/50 border border-orange-200 dark:border-orange-500/20 rounded-lg px-3 py-2 text-sm text-orange-900 dark:text-orange-100"
+                                 />
+                             </div>
+
                              <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase">
                                     <Eye className="w-3.5 h-3.5" /> Scene Description
@@ -807,12 +945,12 @@ const App: React.FC = () => {
                              
                              <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-xs font-bold text-indigo-500 uppercase">
-                                    <Sparkles className="w-3.5 h-3.5" /> Image Prompt (English)
+                                    <Sparkles className="w-3.5 h-3.5" /> Visual Prompt (Action & Angle)
                                 </label>
                                 <textarea
                                   value={panel.visualPromptEn}
                                   onChange={(e) => handleUpdatePanel(index, 'visualPromptEn', e.target.value)}
-                                  className="w-full h-32 bg-indigo-50/50 dark:bg-slate-950/50 border border-indigo-200 dark:border-indigo-500/20 rounded-xl p-3 text-sm text-indigo-900 dark:text-indigo-100/90 font-mono leading-relaxed focus:border-indigo-500 focus:ring-0 outline-none resize-none"
+                                  className="w-full h-24 bg-indigo-50/50 dark:bg-slate-950/50 border border-indigo-200 dark:border-indigo-500/20 rounded-xl p-3 text-sm text-indigo-900 dark:text-indigo-100/90 font-mono leading-relaxed focus:border-indigo-500 focus:ring-0 outline-none resize-none"
                                 />
                              </div>
                           </div>
@@ -954,7 +1092,7 @@ const App: React.FC = () => {
                                 onChange={(e) => setPageTemplate(e.target.value as PageTemplate)}
                                 className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:border-indigo-500 outline-none"
                             >
-                                <option value="dynamic">Layout: Dynamic</option>
+                                <option value="dynamic">Layout: Free Canvas</option>
                                 <option value="webtoon">Layout: Webtoon</option>
                                 <option value="four_koma">Layout: 4-Koma</option>
                             </select>
@@ -974,11 +1112,11 @@ const App: React.FC = () => {
               {/* Canvas Container */}
               <div className="w-full px-4 md:px-8 pb-40 flex justify-center">
                   <div className="w-full max-w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300">
-                      <div ref={resultRef} className={`w-full bg-white mx-auto p-4 md:p-8 box-border min-h-[1000px] ${pageTemplate === 'webtoon' ? 'pb-20' : ''}`}>
+                      <div ref={resultRef} className={`w-full bg-white mx-auto p-4 md:p-8 box-border min-h-[1200px] relative ${pageTemplate === 'webtoon' ? 'pb-20' : ''}`}>
                         
                         {/* Cover */}
                         {(storyboard.coverImagePrompt || storyboard.coverImageUrl) && (
-                            <div className="mb-6 w-full relative">
+                            <div className="mb-16 w-full relative">
                             {storyboard.coverImageUrl ? (
                                 <div className={`w-full ${storyboard.coverAspectRatio === 'landscape' ? 'aspect-[16/9]' : 'aspect-[3/4] max-w-[600px] mx-auto'} relative overflow-hidden border-[4px] border-black shadow-lg`}>
                                     <img 
@@ -1008,24 +1146,82 @@ const App: React.FC = () => {
                             </div>
                         )}
 
-                        {/* Manga Grid */}
-                        <div className={`w-full ${pageTemplate === 'dynamic' ? 'grid grid-cols-2 gap-3' : 'flex flex-col gap-4'}`}>
-                            {layoutPanels.map((panel) => (
-                                <div 
-                                  key={panel.id} 
-                                  className={`${panel.gridColSpan} ${panel.gridRowSpan} relative`}
-                                >
-                                    <ComicPanel 
-                                        panel={{...panel, panelSize: panel.displaySize}} 
-                                        onRegenerate={handleRegeneratePanel}
-                                        styleMode={storyboard.styleMode}
-                                        renderMode={storyboard.renderMode}
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                        {/* Manga Grid / Canvas */}
+                        {pageTemplate === 'dynamic' ? (
+                            <div className="relative w-full h-full min-h-[800px]">
+                                {storyboard.panels.map((panel, idx) => (
+                                    <Rnd
+                                        key={panel.id}
+                                        size={{
+                                            width: panel.layout?.width || 300,
+                                            height: panel.layout?.height || 300
+                                        }}
+                                        position={{
+                                            x: panel.layout?.x || 0,
+                                            y: panel.layout?.y || 0
+                                        }}
+                                        onDragStop={(_e, d) => updatePanelLayout(idx, { x: d.x, y: d.y })}
+                                        onResizeStop={(_e, _direction, ref, _delta, position) => {
+                                            updatePanelLayout(idx, {
+                                                width: ref.style.width,
+                                                height: ref.style.height,
+                                                ...position,
+                                            });
+                                        }}
+                                        onMouseDown={() => bringToFront(idx)}
+                                        style={{ zIndex: panel.layout?.zIndex || 1 }}
+                                        bounds="parent"
+                                        className="group/panel-container"
+                                        resizeHandleStyles={{
+                                            bottomRight: { cursor: 'se-resize', width: 20, height: 20, bottom: 0, right: 0, background: 'transparent' }
+                                        }}
+                                    >
+                                        <div className="w-full h-full relative shadow-lg hover:shadow-xl transition-shadow">
+                                            <ComicPanel
+                                                panel={{...panel, panelSize: 'square'}} // Aspect ratio handled by Rnd dimensions now
+                                                onRegenerate={handleRegeneratePanel}
+                                                styleMode={storyboard.styleMode}
+                                                renderMode={storyboard.renderMode}
+                                            />
+
+                                            {/* Resize Handle Visual */}
+                                            <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50" />
+
+                                            {/* Size Presets (Floating) */}
+                                            <div className="absolute top-2 right-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
+                                                <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1">
+                                                    <button
+                                                        onClick={() => updatePanelLayout(idx, { width: 300, height: 300 })}
+                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        title="Reset to Square"
+                                                    >
+                                                        <Layout className="w-3 h-3" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Rnd>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="w-full flex flex-col gap-4">
+                                {layoutPanels.map((panel) => (
+                                    <div
+                                      key={panel.id}
+                                      className={`${panel.gridColSpan} ${panel.gridRowSpan} relative`}
+                                    >
+                                        <ComicPanel
+                                            panel={{...panel, panelSize: panel.displaySize}}
+                                            onRegenerate={handleRegeneratePanel}
+                                            styleMode={storyboard.styleMode}
+                                            renderMode={storyboard.renderMode}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         
-                        <div className="mt-16 flex justify-between text-black/40 font-mono text-[10px] border-t-2 border-black/10 pt-2 uppercase tracking-widest">
+                        <div className="mt-32 flex justify-between text-black/40 font-mono text-[10px] border-t-2 border-black/10 pt-2 uppercase tracking-widest">
                             <span>Generated by MangaGen Pro</span>
                             <span>{new Date().toLocaleDateString()}</span>
                         </div>
