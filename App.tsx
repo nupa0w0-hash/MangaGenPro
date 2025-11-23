@@ -190,8 +190,10 @@ const App: React.FC = () => {
   const initializeLayouts = () => {
       if (!storyboard) return;
 
-      const canvasWidth = 800;
-      const gap = 24; // Increased gap/margin to prevent overflow
+      // Adjust canvas width to fit within the double-padded container (800 - 32*4 = 672)
+      // Wrapper padding: 32px * 2, Inner padding: 32px * 2
+      const canvasWidth = 672;
+      const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
 
       let colHeights = [gap, gap]; // y-offset for col 0 and col 1
@@ -274,8 +276,9 @@ const App: React.FC = () => {
       setStoryboard({ ...storyboard, panels: clearedPanels, coverLayout: undefined });
 
       // Let's construct fully here to be safe
-      const canvasWidth = 800;
-      const gap = 24; // Increased gap
+      // Adjust canvas width to fit within the double-padded container (800 - 32*4 = 672)
+      const canvasWidth = 672;
+      const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2;
       let colHeights = [gap, gap];
 
@@ -976,9 +979,14 @@ const App: React.FC = () => {
                                 <label className="text-xs font-bold text-slate-500 uppercase block">Cover Art Prompt</label>
                                 <div className="flex gap-2">
                                     {storyboard.coverImagePrompt && (
-                                        <button onClick={handleRegenerateCoverPrompt} disabled={isRerollingCoverPrompt} className="text-xs flex items-center gap-1 text-indigo-500 hover:text-indigo-400 disabled:opacity-50">
-                                            {isRerollingCoverPrompt ? <Loader2 className="w-3 h-3 animate-spin"/> : <RefreshCcw className="w-3 h-3"/>} Reroll
-                                        </button>
+                                        <>
+                                            <button onClick={handleRegenerateCoverPrompt} disabled={isRerollingCoverPrompt} className="text-xs flex items-center gap-1 text-indigo-500 hover:text-indigo-400 disabled:opacity-50" title="Reroll Prompt">
+                                                {isRerollingCoverPrompt ? <Loader2 className="w-3 h-3 animate-spin"/> : <RefreshCcw className="w-3 h-3"/>} Prompt
+                                            </button>
+                                            <button onClick={handleRegenerateCoverImage} disabled={generatingCover} className="text-xs flex items-center gap-1 text-indigo-500 hover:text-indigo-400 disabled:opacity-50" title="Generate/Reroll Image">
+                                                {generatingCover ? <Loader2 className="w-3 h-3 animate-spin"/> : <RefreshCw className="w-3 h-3"/>} Image
+                                            </button>
+                                        </>
                                     )}
                                     <button onClick={handleToggleCover} className={`text-xs flex items-center gap-1 ${storyboard.coverImagePrompt ? 'text-red-500 hover:text-red-400' : 'text-indigo-500 hover:text-indigo-400'}`}>
                                         {storyboard.coverImagePrompt ? <><XCircle className="w-3 h-3"/> Remove</> : <><Plus className="w-3 h-3"/> Add Cover</>}
@@ -1230,11 +1238,11 @@ const App: React.FC = () => {
                             )}
                          </div>
 
-                         <div className="flex items-center gap-2 w-full sm:w-auto">
+                         <div className="flex items-center gap-4 w-full sm:w-auto">
                             <select 
                                 value={pageTemplate}
                                 onChange={(e) => setPageTemplate(e.target.value as PageTemplate)}
-                                className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:border-indigo-500 outline-none"
+                                className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:border-indigo-500 outline-none min-w-[140px]"
                             >
                                 <option value="dynamic">Layout: Free Canvas</option>
                                 <option value="webtoon">Layout: Webtoon</option>
@@ -1243,7 +1251,7 @@ const App: React.FC = () => {
 
                             <button
                                 onClick={resetLayouts}
-                                className="flex items-center justify-center gap-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"
+                                className="flex items-center justify-center gap-1.5 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"
                                 title="Reset Layout Positions"
                             >
                                 <RefreshCcw className="w-3.5 h-3.5" /> Reset
@@ -1343,13 +1351,13 @@ const App: React.FC = () => {
 
                                             {/* Hover Frame to indicate draggable */}
                                             <div className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none" />
-                                            <div className="absolute top-2 right-2 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="absolute top-3 left-3 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                                                 Cover (Drag/Resize)
                                             </div>
 
                                             {/* Cover Reroll Button */}
                                             {storyboard.coverImageUrl && (
-                                                <div className="absolute top-0 left-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-50">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleRegenerateCoverImage(); }}
                                                         className="bg-white/90 backdrop-blur text-slate-800 p-2 rounded-full shadow-lg border border-slate-200 hover:scale-110 transition-transform hover:text-indigo-600"
