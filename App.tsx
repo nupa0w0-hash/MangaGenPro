@@ -10,7 +10,7 @@ import {
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
-  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move
+  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -49,6 +49,7 @@ const App: React.FC = () => {
   const [currentPanelIndex, setCurrentPanelIndex] = useState<number>(-1); 
   const [generatingCover, setGeneratingCover] = useState(false);
   const [isRerollingCoverPrompt, setIsRerollingCoverPrompt] = useState(false);
+  const [activeSettingsPanel, setActiveSettingsPanel] = useState<number | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
 
   // Initialize Theme & Check API Key
@@ -1318,13 +1319,13 @@ const App: React.FC = () => {
                     }}
                   >
                     <div
-                        className="w-[800px] bg-white dark:bg-slate-900 p-1 md:p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300 origin-top-left absolute top-0 left-0"
+                        className="w-[800px] bg-white dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden transition-colors duration-300 origin-top-left absolute top-0 left-0"
                         style={{ transform: `scale(${scale})` }}
                     >
                       {/* Note: We force min-height based on calculation to allow scrolling */}
                       <div
                          ref={resultRef}
-                         className={`w-full bg-white mx-auto p-4 md:p-8 box-border relative transition-all duration-300 ease-out`}
+                         className={`w-full bg-white mx-auto p-8 box-border relative transition-all duration-300 ease-out`}
                          style={{ height: pageTemplate === 'dynamic' ? containerHeight : 'auto', minHeight: '1200px' }}
                       >
                         
@@ -1451,31 +1452,51 @@ const App: React.FC = () => {
                                                 </div>
                                             </div>
 
-                                            {/* Size Presets (Floating) - Always visible on mobile */}
-                                            <div className="absolute top-2 left-2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
-                                                <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1">
+                                            {/* Size Presets (Floating) - Toggleable on click */}
+                                            <div className="absolute top-2 left-2 z-50 flex gap-1">
+                                                {activeSettingsPanel === idx ? (
+                                                    <div onPointerDown={(e) => e.stopPropagation()} className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in">
+                                                        <button
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            title="Square (300x300)"
+                                                        >
+                                                            <div className="w-3 h-3 border border-current"></div>
+                                                        </button>
+                                                        <button
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); setActiveSettingsPanel(null); }}
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            title="Wide (616x300)"
+                                                        >
+                                                            <div className="w-5 h-3 border border-current"></div>
+                                                        </button>
+                                                        <button
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); setActiveSettingsPanel(null); }}
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                            title="Tall (300x450)"
+                                                        >
+                                                            <div className="w-3 h-5 border border-current"></div>
+                                                        </button>
+                                                        <button
+                                                            onPointerDown={(e) => e.stopPropagation()}
+                                                            onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(null); }}
+                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-400"
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                ) : (
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); }}
-                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
-                                                        title="Square (300x300)"
+                                                        onPointerDown={(e) => e.stopPropagation()}
+                                                        onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
+                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100"
                                                     >
-                                                        <div className="w-3 h-3 border border-current"></div>
+                                                       <Settings2 className="w-4 h-4" />
                                                     </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); }}
-                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
-                                                        title="Wide (616x300)"
-                                                    >
-                                                        <div className="w-5 h-3 border border-current"></div>
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); }}
-                                                        className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500"
-                                                        title="Tall (300x450)"
-                                                    >
-                                                        <div className="w-3 h-5 border border-current"></div>
-                                                    </button>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     </Rnd>

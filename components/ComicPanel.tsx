@@ -42,14 +42,14 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
         if (dialogue.type === 'narration') {
             return (
                 <div key={index} className={`absolute z-10 max-w-[85%] bg-white border-2 border-black px-4 py-2 shadow-[2px_2px_0px_rgba(0,0,0,0.2)] ${index === 0 ? 'top-3 left-3' : 'bottom-3 right-3'}`}>
-                    <span className="font-manga font-bold text-sm md:text-base block text-black leading-relaxed">{dialogue.text}</span>
+                    <span className="font-manga font-bold text-base block text-black leading-relaxed">{dialogue.text}</span>
                 </div>
             );
         }
 
         let svgContent;
-        let textClass = "relative z-10 text-sm md:text-base text-center leading-snug";
-        let containerClass = `absolute z-10 max-w-[65%] flex items-center justify-center p-6 md:p-8 ${positionClass}`;
+        let textClass = "relative z-10 text-base text-center leading-snug";
+        let containerClass = `absolute z-10 max-w-[65%] flex items-center justify-center p-8 ${positionClass}`;
         
         if (dialogue.type === 'shout') {
             svgContent = (
@@ -57,7 +57,7 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
                   <path d="M10,70 L20,50 L10,30 L40,40 L50,10 L70,40 L100,10 L130,40 L150,10 L160,40 L190,30 L180,50 L190,70 L180,90 L190,110 L160,100 L150,130 L130,100 L100,130 L70,100 L50,130 L40,100 L10,110 L20,90 Z" fill="white" stroke="black" strokeWidth="3" />
                 </svg>
             );
-            textClass += " font-black text-lg md:text-xl font-comic tracking-tighter uppercase";
+            textClass += " font-black text-xl font-comic tracking-tighter uppercase";
         } else if (dialogue.type === 'thought') {
             svgContent = (
                 <svg viewBox="0 0 200 140" className="absolute inset-0 w-full h-full drop-shadow-md opacity-95" preserveAspectRatio="none">
