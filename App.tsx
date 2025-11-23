@@ -130,6 +130,137 @@ const App: React.FC = () => {
       return () => clearTimeout(timer);
   }, [storyLog, characters, storyboard, styleMode, renderMode, coverRatio, pageTemplate]);
 
+  // ------------------------------------------------------------------
+  // Layout Management & Initialization
+  // ------------------------------------------------------------------
+  useEffect(() => {
+      if (activeTab !== 'result' || !storyboard || pageTemplate !== 'dynamic') return;
+
+      // Check if layout needs initialization (or re-sync)
+      // We force re-sync if layout is missing OR if panelSize changed significantly?
+      // For now, just ensure every panel has a layout.
+      const needsInit = storyboard.panels.some(p => !p.layout);
+
+      if (needsInit) {
+          initializeLayouts();
+      }
+  }, [activeTab, storyboard?.panels?.length, pageTemplate]);
+
+  const initializeLayouts = () => {
+      if (!storyboard) return;
+
+      const canvasWidth = 800;
+      const gap = 16;
+      const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
+
+      let colHeights = [gap, gap]; // y-offset for col 0 and col 1
+
+      const newPanels = storyboard.panels.map((panel, idx) => {
+          // If already has layout, keep it (unless we want to force reset?)
+          // Let's keep existing layout if valid to prevent jumps
+          if (panel.layout && panel.layout.width && panel.layout.height) return panel;
+
+          // Determine dimensions based on panelSize preference
+          let w = colWidth;
+          let h = colWidth; // Square default (1:1)
+
+          if (panel.panelSize === 'wide') {
+              w = (colWidth * 2) + gap; // Span 2 cols
+              h = colWidth * 0.56; // 16:9 approx
+          } else if (panel.panelSize === 'tall') {
+              h = colWidth * 1.33; // 3:4 approx
+          }
+
+          // Determine position
+          // Simple Masonry: pick shorter column
+          // Exception: Wide panels always start at col 0
+          let colIndex = colHeights[0] <= colHeights[1] ? 0 : 1;
+
+          if (panel.panelSize === 'wide') {
+              colIndex = 0;
+              // Push down to max of both columns to avoid overlap
+              const startY = Math.max(colHeights[0], colHeights[1]);
+              colHeights[0] = startY;
+              colHeights[1] = startY;
+          }
+
+          const x = gap + (colIndex * (colWidth + gap));
+          const y = colHeights[colIndex];
+
+          // Update heights
+          if (panel.panelSize === 'wide') {
+              colHeights[0] += h + gap;
+              colHeights[1] += h + gap;
+          } else {
+              colHeights[colIndex] += h + gap;
+          }
+
+          return {
+              ...panel,
+              layout: {
+                  x, y, width: w, height: h, zIndex: idx + 1
+              }
+          };
+      });
+
+      setStoryboard(prev => prev ? { ...prev, panels: newPanels } : null);
+  };
+
+  const resetLayouts = () => {
+      if (!storyboard) return;
+      // Clear layouts and re-run initialization
+      const clearedPanels = storyboard.panels.map(p => ({ ...p, layout: undefined }));
+      setStoryboard({ ...storyboard, panels: clearedPanels });
+      // The useEffect will trigger initializeLayouts automatically on next render
+      // but state update is async, so we might want to call it manually or wait.
+      // Actually, setting layout undefined works if we call init immediately with the new state,
+      // but easier to just let effect handle it or construct new state fully here.
+
+      // Let's construct fully here to be safe
+      const canvasWidth = 800;
+      const gap = 16;
+      const colWidth = (canvasWidth - gap * 3) / 2;
+      let colHeights = [gap, gap];
+
+      const newPanels = clearedPanels.map((panel, idx) => {
+          let w = colWidth;
+          let h = colWidth;
+          if (panel.panelSize === 'wide') {
+              w = (colWidth * 2) + gap;
+              h = colWidth * 0.56;
+          } else if (panel.panelSize === 'tall') {
+              h = colWidth * 1.33;
+          }
+
+          let colIndex = colHeights[0] <= colHeights[1] ? 0 : 1;
+          if (panel.panelSize === 'wide') {
+              colIndex = 0;
+              const startY = Math.max(colHeights[0], colHeights[1]);
+              colHeights[0] = startY;
+              colHeights[1] = startY;
+          }
+
+          const x = gap + (colIndex * (colWidth + gap));
+          const y = colHeights[colIndex];
+
+          if (panel.panelSize === 'wide') {
+              colHeights[0] += h + gap;
+              colHeights[1] += h + gap;
+          } else {
+              colHeights[colIndex] += h + gap;
+          }
+
+          return {
+              ...panel,
+              layout: { x, y, width: w, height: h, zIndex: idx + 1 }
+          };
+      });
+
+      setStoryboard({ ...storyboard, panels: newPanels });
+  };
+
+  // ... (rest of functions)
+
   const saveBookmark = () => {
     if (!storyLog.trim()) return;
     const title = storyLog.slice(0, 20) + (storyLog.length > 20 ? '...' : '');
@@ -171,27 +302,6 @@ const App: React.FC = () => {
       const updated = bookmarks.filter(b => b.id !== id);
       setBookmarks(updated);
       localStorage.setItem('storyBookmarks', JSON.stringify(updated));
-  };
-
-  const loadAutosave = () => {
-      const autosave = localStorage.getItem('mangaGen_autosave');
-      if (autosave && confirm('가장 최근 자동 저장 데이터를 불러오시겠습니까?')) {
-        try {
-            const data = JSON.parse(autosave);
-            if (data.storyLog) setStoryLog(data.storyLog);
-            if (data.characters) setCharacters(data.characters);
-            if (data.storyboard) setStoryboard(data.storyboard);
-            if (data.styleMode) setStyleMode(data.styleMode);
-            if (data.renderMode) setRenderMode(data.renderMode);
-            if (data.coverRatio) setCoverRatio(data.coverRatio);
-            if (data.pageTemplate) setPageTemplate(data.pageTemplate);
-            
-            if (data.storyboard) setActiveTab('preview');
-            else setActiveTab('input');
-        } catch(e) { console.error(e); }
-      } else if (!autosave) {
-          alert("저장된 데이터가 없습니다.");
-      }
   };
 
   const handleGenerateStoryboard = async () => {
@@ -351,85 +461,14 @@ const App: React.FC = () => {
       finally { setGeneratingCover(false); }
     }
 
-    // Initialize layouts for Free Canvas if needed
-    // Simple logic: if missing layout, assign default grid positions
-    const canvasWidth = 800; // Approximate width of result container
-    const gap = 16;
-    const colWidth = (canvasWidth - gap * 3) / 2;
-
-    // Create a deep copy to avoid mutating state directly before set
-    const updatedPanels = storyboard.panels.map((panel, idx) => {
-       if (panel.layout) return panel;
-
-       // Calculate simple grid position
-       const col = idx % 2;
-       const row = Math.floor(idx / 2);
-
-       // Default sizes based on panelSize preference
-       let width: number = colWidth;
-       let height: number = colWidth; // Square by default
-
-       if (panel.panelSize === 'wide') {
-           width = colWidth * 2 + gap; // Span full width? Or just wider?
-           // If spanning full width, we need to adjust subsequent items, but for simplicity
-           // let's just make it 2 columns wide if it fits, otherwise normal.
-           // Actually, let's just stick to the simple 2-column grid initial placement
-           // regardless of preference, users can resize.
-           // Or better: mimic the visual size
-       }
-
-       if (panel.panelSize === 'tall') height = colWidth * 1.5;
-       if (panel.panelSize === 'wide') width = colWidth; // Keep it in column for now, user can stretch
-
-       // Naive Grid Calculation
-       const x = gap + (col * (colWidth + gap));
-       const y = gap + (row * (colWidth + gap)); // Rough estimation, rows overlap if heights differ
-
-       // Better approach: track Y per column
-       // But we are inside a map. We'll do a second pass or just use rough grid.
-       // Let's effectively just stack them for safety if initializing.
-
-       return {
-           ...panel,
-           layout: {
-               x: x,
-               y: y, // This will overlap rows heavily if we don't track heights.
-               width: colWidth,
-               height: panel.panelSize === 'tall' ? colWidth * 1.3 : (panel.panelSize === 'wide' ? colWidth * 0.7 : colWidth),
-               zIndex: idx + 1
-           }
-       };
-    });
-
-    // Improved layout initialization (Waterfall)
-    if (updatedPanels.some(p => !storyboard.panels.find(op => op.id === p.id)?.layout)) {
-        let colHeights = [gap, gap]; // Top offsets for 2 columns
-        updatedPanels.forEach((panel, idx) => {
-            if (storyboard.panels[idx].layout) return; // Already has layout
-
-            const colIndex = colHeights[0] <= colHeights[1] ? 0 : 1;
-            const x = gap + (colIndex * (colWidth + gap));
-            const y = colHeights[colIndex];
-
-            // Default dimensions
-            const w = colWidth;
-            const h = panel.panelSize === 'tall' ? w * 1.4 : (panel.panelSize === 'wide' ? w * 0.6 : w);
-
-            panel.layout = { x, y, width: w, height: h, zIndex: idx + 1 };
-
-            colHeights[colIndex] += h + gap;
-        });
-
-        setStoryboard(prev => prev ? { ...prev, panels: updatedPanels } : null);
-    }
-
+    // We no longer initialize layout here explicitly, the useEffect handles it
+    // However, we need to ensure panels are ready
     setCurrentPanelIndex(0);
-    // Use the possibly updated panels
-    const panelsToGen = updatedPanels;
-    for (let i = 0; i < panelsToGen.length; i++) {
+    const panels = storyboard.panels;
+    for (let i = 0; i < panels.length; i++) {
        setCurrentPanelIndex(i);
-       if (panelsToGen[i].status !== 'completed') {
-          await generateSinglePanel(panelsToGen[i], characters, currentStyle, currentRenderMode);
+       if (panels[i].status !== 'completed') {
+          await generateSinglePanel(panels[i], characters, currentStyle, currentRenderMode);
        }
     }
     setCurrentPanelIndex(-1);
@@ -438,31 +477,6 @@ const App: React.FC = () => {
   const handleRegeneratePanel = async (panel: Panel) => {
     if (!storyboard) return;
     await generateSinglePanel(panel, characters, storyboard.styleMode, storyboard.renderMode);
-  };
-
-  const handleDownload = async () => {
-    if (!resultRef.current) return;
-    // @ts-ignore
-    if (!window.html2canvas) {
-        alert("html2canvas 라이브러리가 로드되지 않았습니다.");
-        return;
-    }
-    try {
-      // @ts-ignore
-      const canvas = await window.html2canvas(resultRef.current, {
-        scale: 2, 
-        useCORS: true,
-        backgroundColor: '#ffffff',
-        logging: false
-      });
-      const link = document.createElement('a');
-      link.download = `${storyboard?.title || 'manga_page'}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    } catch (err) {
-      console.error("Download failed", err);
-      alert("이미지 다운로드에 실패했습니다.");
-    }
   };
 
   const calculateStrictLayout = (): LayoutPanel[] => {
@@ -474,52 +488,9 @@ const App: React.FC = () => {
     if (pageTemplate === 'four_koma') {
          return inputPanels.map(p => ({ ...p, gridColSpan: 'col-span-2', gridRowSpan: 'row-span-1', displaySize: 'wide' }));
     }
-    const layoutPanels: LayoutPanel[] = [];
-    const blockedCells: Set<string> = new Set();
-    const isBlocked = (r: number, c: number) => blockedCells.has(`${r},${c}`);
-    const markBlocked = (r: number, c: number) => blockedCells.add(`${r},${c}`);
-
-    let currentRow = 0;
-    let currentCol = 0;
-
-    for (let i = 0; i < inputPanels.length; i++) {
-      const panel = inputPanels[i];
-      while (isBlocked(currentRow, currentCol)) {
-        currentCol++;
-        if (currentCol > 1) { currentCol = 0; currentRow++; }
-      }
-      let effectiveSize = panel.panelSize;
-      if (effectiveSize === 'wide') {
-        if (currentCol !== 0) { effectiveSize = 'square'; } 
-        else if (isBlocked(currentRow, 1)) { effectiveSize = 'square'; }
-      }
-      const lp: LayoutPanel = { 
-        ...panel, gridColSpan: 'col-span-1', gridRowSpan: 'row-span-1',
-        displaySize: effectiveSize === 'wide' ? 'wide' : effectiveSize === 'tall' ? 'tall' : 'square'
-      };
-      if (effectiveSize === 'wide') {
-        lp.gridColSpan = 'col-span-2';
-        markBlocked(currentRow, 0); markBlocked(currentRow, 1);
-        currentCol = 0; currentRow++; 
-      } else if (effectiveSize === 'tall') {
-        lp.gridRowSpan = 'row-span-2';
-        markBlocked(currentRow, currentCol); markBlocked(currentRow + 1, currentCol);
-        currentCol++;
-        if (currentCol > 1) { currentCol = 0; currentRow++; }
-      } else { 
-        lp.gridColSpan = 'col-span-1'; lp.gridRowSpan = 'row-span-1';
-        markBlocked(currentRow, currentCol);
-        currentCol++;
-        if (currentCol > 1) { currentCol = 0; currentRow++; }
-      }
-      layoutPanels.push(lp);
-    }
-    return layoutPanels;
+    // Fallback empty array as Dynamic uses Rnd now
+    return [];
   };
-
-  // Only use strict layout if NOT dynamic (or if we want to force it)
-  // But for Dynamic, we now want Free Canvas.
-  // We'll keep this for 'webtoon'/'four_koma' logic if needed, but primarily iterate on panels directly.
   const layoutPanels = calculateStrictLayout();
 
   // Handlers for Rnd
@@ -552,6 +523,7 @@ const App: React.FC = () => {
   if (!isApiReady) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 p-4 transition-colors duration-300">
+            {/* ... (same as before) */}
             <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 max-w-md w-full animate-fade-in">
                 <div className="flex justify-center mb-6">
                     <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-3 rounded-xl shadow-lg shadow-indigo-500/20">
@@ -801,7 +773,7 @@ const App: React.FC = () => {
           {/* TAB: PREVIEW */}
           {activeTab === 'preview' && storyboard && (
              <div className="max-w-6xl mx-auto p-6 md:p-8 pb-32 animate-slide-up">
-                
+                {/* ... (Same Preview code as before) ... */}
                 {/* Editor Header */}
                 <div className="sticky top-0 z-30 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-md pb-6 mb-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-end">
                     <div>
@@ -1097,6 +1069,14 @@ const App: React.FC = () => {
                                 <option value="four_koma">Layout: 4-Koma</option>
                             </select>
 
+                            <button
+                                onClick={resetLayouts}
+                                className="flex items-center justify-center gap-1 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"
+                                title="Reset Layout Positions"
+                            >
+                                <RefreshCcw className="w-3.5 h-3.5" /> Reset
+                            </button>
+
                             <button 
                             onClick={handleDownload}
                             disabled={currentPanelIndex !== -1 || generatingCover}
@@ -1172,16 +1152,19 @@ const App: React.FC = () => {
                                         style={{ zIndex: panel.layout?.zIndex || 1 }}
                                         bounds="parent"
                                         className="group/panel-container"
+                                        enableUserSelectHack={false}
+                                        dragHandleClassName="drag-handle"
                                         resizeHandleStyles={{
                                             bottomRight: { cursor: 'se-resize', width: 20, height: 20, bottom: 0, right: 0, background: 'transparent' }
                                         }}
                                     >
-                                        <div className="w-full h-full relative shadow-lg hover:shadow-xl transition-shadow">
+                                        <div className="w-full h-full relative shadow-lg hover:shadow-xl transition-shadow drag-handle cursor-move">
                                             <ComicPanel
                                                 panel={{...panel, panelSize: 'square'}} // Aspect ratio handled by Rnd dimensions now
                                                 onRegenerate={handleRegeneratePanel}
                                                 styleMode={storyboard.styleMode}
                                                 renderMode={storyboard.renderMode}
+                                                isFreeMode={true}
                                             />
 
                                             {/* Resize Handle Visual */}
@@ -1191,11 +1174,25 @@ const App: React.FC = () => {
                                             <div className="absolute top-2 right-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
                                                 <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1">
                                                     <button
-                                                        onClick={() => updatePanelLayout(idx, { width: 300, height: 300 })}
+                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); }}
                                                         className="p-1 rounded hover:bg-slate-100 text-slate-500"
-                                                        title="Reset to Square"
+                                                        title="Square (300x300)"
                                                     >
-                                                        <Layout className="w-3 h-3" />
+                                                        <div className="w-3 h-3 border border-current"></div>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); }}
+                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        title="Wide (616x300)"
+                                                    >
+                                                        <div className="w-5 h-3 border border-current"></div>
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); }}
+                                                        className="p-1 rounded hover:bg-slate-100 text-slate-500"
+                                                        title="Tall (300x450)"
+                                                    >
+                                                        <div className="w-3 h-5 border border-current"></div>
                                                     </button>
                                                 </div>
                                             </div>
