@@ -178,6 +178,57 @@ export const generateStoryboard = async (
   }
 };
 
+// New Function: Regenerate cover prompt
+export const regenerateCoverPrompt = async (
+  storyLog: string,
+  characters: Character[],
+  styleMode: StyleMode
+): Promise<string> => {
+  const ai = getAiClient();
+
+  const characterContext = characters
+    .map((c) => `- Name: "${c.name}", Description: ${c.description}`)
+    .join("\n");
+
+  const prompt = `
+    Based on the story log and characters, generate a NEW, Creative, and Impactful Cover Art Prompt for the manga.
+
+    [Story Log]
+    ${storyLog}
+
+    [Characters]
+    ${characterContext}
+
+    Output Format: JSON with a single field "coverImagePrompt".
+    The prompt should be in English, describing the visual elements, composition, and mood.
+  `;
+
+  try {
+      const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+          model: STORY_MODEL,
+          contents: prompt,
+          config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                      coverImagePrompt: { type: Type.STRING, description: "Detailed cover art description" }
+                  },
+                  required: ["coverImagePrompt"]
+              }
+          }
+      }));
+
+      const text = response.text;
+      if (!text) throw new Error("Failed to regenerate cover prompt");
+      const json = JSON.parse(text.replace(/```json\n?|```/g, ""));
+      return json.coverImagePrompt;
+  } catch (error) {
+      console.error("Cover prompt regeneration failed", error);
+      throw error;
+  }
+};
+
 // New Function: Regenerate a single panel's script (Reroll)
 export const regeneratePanelScript = async (
   panel: Panel,

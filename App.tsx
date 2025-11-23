@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode, LayoutState } from './types';
-import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript } from './services/geminiService';
+import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript, regenerateCoverPrompt } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
 import { Rnd } from 'react-rnd';
@@ -9,7 +9,7 @@ import { Rnd } from 'react-rnd';
 import { 
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
-  Save, FolderOpen, RefreshCcw, Palette, XCircle, FilePlus, ArchiveRestore,
+  Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key
 } from 'lucide-react';
 
@@ -48,6 +48,7 @@ const App: React.FC = () => {
   // Generation State
   const [currentPanelIndex, setCurrentPanelIndex] = useState<number>(-1); 
   const [generatingCover, setGeneratingCover] = useState(false);
+  const [isRerollingCoverPrompt, setIsRerollingCoverPrompt] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
 
   // Initialize Theme & Check API Key
@@ -157,8 +158,6 @@ const App: React.FC = () => {
       if (activeTab !== 'result' || !storyboard || pageTemplate !== 'dynamic') return;
 
       // Check if layout needs initialization (or re-sync)
-      // We force re-sync if layout is missing OR if panelSize changed significantly?
-      // For now, just ensure every panel has a layout.
       const needsInit = storyboard.panels.some(p => !p.layout) || (storyboard.coverImagePrompt && !storyboard.coverLayout);
 
       if (needsInit) {
@@ -166,27 +165,26 @@ const App: React.FC = () => {
       }
 
       recalcContainerHeight();
-  }, [activeTab, storyboard?.panels?.length, pageTemplate]);
+  }, [activeTab, storyboard, pageTemplate]);
 
-  const recalcContainerHeight = () => {
-      if (!storyboard) return;
+  const calculateMaxHeight = (panels: Panel[], coverLayout?: LayoutState) => {
       let maxY = 0;
-
-      // Check Panels
-      storyboard.panels.forEach(p => {
+      panels.forEach(p => {
           if (p.layout) {
               const bottom = p.layout.y + (typeof p.layout.height === 'number' ? p.layout.height : parseInt(String(p.layout.height)));
               if (bottom > maxY) maxY = bottom;
           }
       });
-
-      // Check Cover
-      if (storyboard.coverLayout) {
-          const bottom = storyboard.coverLayout.y + (typeof storyboard.coverLayout.height === 'number' ? storyboard.coverLayout.height : parseInt(String(storyboard.coverLayout.height)));
+      if (coverLayout) {
+          const bottom = coverLayout.y + (typeof coverLayout.height === 'number' ? coverLayout.height : parseInt(String(coverLayout.height)));
           if (bottom > maxY) maxY = bottom;
       }
+      return Math.max(1200, maxY + 200);
+  };
 
-      setContainerHeight(Math.max(1200, maxY + 200));
+  const recalcContainerHeight = () => {
+      if (!storyboard) return;
+      setContainerHeight(calculateMaxHeight(storyboard.panels, storyboard.coverLayout));
   };
 
   const initializeLayouts = () => {
@@ -333,6 +331,7 @@ const App: React.FC = () => {
       });
 
       setStoryboard({ ...storyboard, panels: newPanels, coverLayout: newCoverLayout });
+      setContainerHeight(calculateMaxHeight(newPanels, newCoverLayout));
   };
 
   // ... (rest of functions)
@@ -467,6 +466,33 @@ const App: React.FC = () => {
            setStoryboard({ ...storyboard, coverImagePrompt: '', coverImageUrl: undefined });
       } else {
            setStoryboard({ ...storyboard, coverImagePrompt: 'Detailed cover art description based on the story theme...', coverImageUrl: undefined });
+      }
+  };
+
+  const handleRegenerateCoverPrompt = async () => {
+      if (!storyboard) return;
+      setIsRerollingCoverPrompt(true);
+      try {
+          const newPrompt = await regenerateCoverPrompt(storyLog, characters, storyboard.styleMode);
+          setStoryboard({ ...storyboard, coverImagePrompt: newPrompt });
+      } catch (e) {
+          alert("표지 프롬프트 재생성에 실패했습니다.");
+      } finally {
+          setIsRerollingCoverPrompt(false);
+      }
+  };
+
+  const handleRegenerateCoverImage = async () => {
+      if (!storyboard || !storyboard.coverImagePrompt) return;
+      setGeneratingCover(true);
+      try {
+          const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, storyboard.styleMode);
+          setStoryboard(prev => prev ? { ...prev, coverImageUrl: coverUrl } : null);
+      } catch (e) {
+          console.error(e);
+          alert("표지 이미지 생성 실패");
+      } finally {
+          setGeneratingCover(false);
       }
   };
 
@@ -621,21 +647,6 @@ const App: React.FC = () => {
   const layoutPanels = calculateStrictLayout();
 
   // Handlers for Rnd
-  const calculateMaxHeight = (panels: Panel[], coverLayout?: LayoutState) => {
-      let maxY = 0;
-      panels.forEach(p => {
-          if (p.layout) {
-              const bottom = p.layout.y + (typeof p.layout.height === 'number' ? p.layout.height : parseInt(String(p.layout.height)));
-              if (bottom > maxY) maxY = bottom;
-          }
-      });
-      if (coverLayout) {
-          const bottom = coverLayout.y + (typeof coverLayout.height === 'number' ? coverLayout.height : parseInt(String(coverLayout.height)));
-          if (bottom > maxY) maxY = bottom;
-      }
-      return Math.max(1200, maxY + 200);
-  };
-
   const updatePanelLayout = (index: number, newLayout: Partial<LayoutState>) => {
       if (!storyboard) return;
       const newPanels = [...storyboard.panels];
@@ -963,9 +974,16 @@ const App: React.FC = () => {
                        <div>
                             <div className="flex justify-between mb-2">
                                 <label className="text-xs font-bold text-slate-500 uppercase block">Cover Art Prompt</label>
-                                <button onClick={handleToggleCover} className={`text-xs flex items-center gap-1 ${storyboard.coverImagePrompt ? 'text-red-500 hover:text-red-400' : 'text-indigo-500 hover:text-indigo-400'}`}>
-                                    {storyboard.coverImagePrompt ? <><XCircle className="w-3 h-3"/> Remove</> : <><Plus className="w-3 h-3"/> Add Cover</>}
-                                </button>
+                                <div className="flex gap-2">
+                                    {storyboard.coverImagePrompt && (
+                                        <button onClick={handleRegenerateCoverPrompt} disabled={isRerollingCoverPrompt} className="text-xs flex items-center gap-1 text-indigo-500 hover:text-indigo-400 disabled:opacity-50">
+                                            {isRerollingCoverPrompt ? <Loader2 className="w-3 h-3 animate-spin"/> : <RefreshCcw className="w-3 h-3"/>} Reroll
+                                        </button>
+                                    )}
+                                    <button onClick={handleToggleCover} className={`text-xs flex items-center gap-1 ${storyboard.coverImagePrompt ? 'text-red-500 hover:text-red-400' : 'text-indigo-500 hover:text-indigo-400'}`}>
+                                        {storyboard.coverImagePrompt ? <><XCircle className="w-3 h-3"/> Remove</> : <><Plus className="w-3 h-3"/> Add Cover</>}
+                                    </button>
+                                </div>
                             </div>
                             {storyboard.coverImagePrompt ? (
                                 <textarea 
@@ -1325,6 +1343,19 @@ const App: React.FC = () => {
                                             <div className="absolute top-2 right-2 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                                                 Cover (Drag/Resize)
                                             </div>
+
+                                            {/* Cover Reroll Button */}
+                                            {storyboard.coverImageUrl && (
+                                                <div className="absolute top-0 left-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleRegenerateCoverImage(); }}
+                                                        className="bg-white/90 backdrop-blur text-slate-800 p-2 rounded-full shadow-lg border border-slate-200 hover:scale-110 transition-transform hover:text-indigo-600"
+                                                        title="표지 다시 그리기"
+                                                    >
+                                                        <RefreshCw className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </Rnd>
                                 )}
@@ -1372,7 +1403,7 @@ const App: React.FC = () => {
                                             <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50" />
 
                                             {/* Size Presets (Floating) */}
-                                            <div className="absolute top-2 right-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
+                                            <div className="absolute top-2 left-2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 flex gap-1">
                                                 <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); }}
