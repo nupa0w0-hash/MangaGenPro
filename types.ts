@@ -48,6 +48,7 @@ export interface Storyboard {
   coverImagePrompt: string; // Prompt for the cover/title image
   coverImageUrl?: string; // Generated cover image URL
   coverAspectRatio: 'landscape' | 'portrait'; // Aspect ratio for the cover
+  coverLayout?: LayoutState; // NEW: Layout state for the cover in dynamic mode
   panels: Panel[];
   styleMode: StyleMode;
   renderMode: RenderMode;
