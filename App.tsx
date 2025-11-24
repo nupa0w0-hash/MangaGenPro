@@ -194,6 +194,9 @@ const App: React.FC = () => {
       // Adjust canvas width to fit within the double-padded container (800 - 32*4 = 672)
       // Wrapper padding: 32px * 2, Inner padding: 32px * 2
       const canvasWidth = 672;
+      const containerWidth = 736; // 800 - 64 (outer p-8 + inner p-8 logic creates offset, actual space is 736)
+      const leftOffset = (containerWidth - canvasWidth) / 2; // ~32px to center the 672px grid in 736px space
+
       const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
 
@@ -204,7 +207,7 @@ const App: React.FC = () => {
       if ((storyboard.coverImagePrompt || storyboard.coverImageUrl) && !newCoverLayout) {
           // Default cover at top
           newCoverLayout = {
-              x: gap,
+              x: gap + leftOffset,
               y: gap,
               width: canvasWidth - (gap * 2), // Full width
               height: storyboard.coverAspectRatio === 'landscape'
@@ -248,7 +251,7 @@ const App: React.FC = () => {
               colHeights[1] = startY;
           }
 
-          const x = gap + (colIndex * (colWidth + gap));
+          const x = gap + (colIndex * (colWidth + gap)) + leftOffset;
           const y = colHeights[colIndex];
 
           // Update heights
@@ -277,8 +280,10 @@ const App: React.FC = () => {
       setStoryboard({ ...storyboard, panels: clearedPanels, coverLayout: undefined });
 
       // Let's construct fully here to be safe
-      // Adjust canvas width to fit within the double-padded container (800 - 32*4 = 672)
       const canvasWidth = 672;
+      const containerWidth = 736;
+      const leftOffset = (containerWidth - canvasWidth) / 2;
+
       const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2;
       let colHeights = [gap, gap];
@@ -287,7 +292,7 @@ const App: React.FC = () => {
       let newCoverLayout;
       if (storyboard.coverImagePrompt || storyboard.coverImageUrl) {
           newCoverLayout = {
-              x: gap,
+              x: gap + leftOffset,
               y: gap,
               width: canvasWidth - (gap * 2),
               height: storyboard.coverAspectRatio === 'landscape'
@@ -318,7 +323,7 @@ const App: React.FC = () => {
               colHeights[1] = startY;
           }
 
-          const x = gap + (colIndex * (colWidth + gap));
+          const x = gap + (colIndex * (colWidth + gap)) + leftOffset;
           const y = colHeights[colIndex];
 
           if (panel.panelSize === 'wide') {
