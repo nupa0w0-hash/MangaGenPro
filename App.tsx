@@ -40,7 +40,8 @@ const App: React.FC = () => {
   const [styleMode, setStyleMode] = useState<StyleMode>('bw');
   const [renderMode, setRenderMode] = useState<RenderMode>('overlay');
   const [pageTemplate, setPageTemplate] = useState<PageTemplate>('dynamic');
-  
+  const [panelCount, setPanelCount] = useState<number | 'unlimited'>(8);
+
   // Bookmark State
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   
@@ -426,7 +427,7 @@ const App: React.FC = () => {
 
     setIsScripting(true);
     try {
-      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, renderMode);
+      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, renderMode, panelCount);
 
       // Ensure no layout data is present to force fresh initialization (Auto-Reset)
       const cleanResult: Storyboard = {
@@ -1017,6 +1018,27 @@ const App: React.FC = () => {
                                    <button onClick={() => setRenderMode('native')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${renderMode === 'native' ? 'bg-white dark:bg-slate-600 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>
                                      AI Native (Baked-in)
                                    </button>
+                               </div>
+                           </div>
+
+                           <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 block flex items-center gap-2">
+                                   <Layout className="w-3 h-3"/> Panel Count
+                               </label>
+                               <div className="grid grid-cols-3 gap-2">
+                                   {[4, 8, 12, 20, 30, 'unlimited'].map((count) => (
+                                       <button
+                                           key={count}
+                                           onClick={() => setPanelCount(count as number | 'unlimited')}
+                                           className={`py-2 text-xs font-medium rounded-md transition-all border ${
+                                               panelCount === count
+                                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/20'
+                                               : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'
+                                           }`}
+                                       >
+                                           {count === 'unlimited' ? '∞' : `${count} Panels`}
+                                       </button>
+                                   ))}
                                </div>
                            </div>
                        </div>
