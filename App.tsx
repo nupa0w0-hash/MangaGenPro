@@ -5,6 +5,7 @@ import { generateStoryboard, generatePanelImage, generateCoverImage, regenerateP
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
 import CharacterEmotionStudio from './components/emotion-studio/CharacterEmotionStudio';
+import MangaTool from './components/MangaTool';
 import { Rnd } from 'react-rnd';
 
 import { 
@@ -12,7 +13,7 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus
+  SmilePlus, Square, BoxSelect
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -21,6 +22,15 @@ type LayoutPanel = Panel & {
   gridRowSpan: string;
   displaySize: 'square' | 'wide' | 'tall';
 };
+
+interface MangaToolItem {
+  id: number;
+  type: 'box';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 const App: React.FC = () => {
   const [isApiReady, setIsApiReady] = useState(false);
@@ -57,6 +67,10 @@ const App: React.FC = () => {
   const [isRerollingCoverPrompt, setIsRerollingCoverPrompt] = useState(false);
   const [activeSettingsPanel, setActiveSettingsPanel] = useState<number | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+
+  // Manga Tools State
+  const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
+  const [showBorders, setShowBorders] = useState(true);
 
   // Initialize Theme & Check API Key
   useEffect(() => {
@@ -562,6 +576,27 @@ const App: React.FC = () => {
   const handleUpdateStoryboard = (field: keyof Storyboard, value: any) => {
     if (!storyboard) return;
     setStoryboard({ ...storyboard, [field]: value });
+  };
+
+  // --- Manga Tool Handlers ---
+  const handleAddTool = (type: 'box') => {
+      const newTool: MangaToolItem = {
+          id: Date.now(),
+          type,
+          x: 250, // Roughly center
+          y: 200,
+          width: 200,
+          height: 100
+      };
+      setAddedTools([...addedTools, newTool]);
+  };
+
+  const handleUpdateTool = (id: number, data: { x: number, y: number, width: number, height: number }) => {
+      setAddedTools(prev => prev.map(tool => tool.id === id ? { ...tool, ...data } : tool));
+  };
+
+  const handleDeleteTool = (id: number) => {
+      setAddedTools(prev => prev.filter(tool => tool.id !== id));
   };
 
   const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode, currentRenderMode: RenderMode) => {
@@ -1369,6 +1404,24 @@ const App: React.FC = () => {
                                 <RefreshCcw className="w-3.5 h-3.5" /> Reset
                             </button>
 
+                            {/* Tool Controls */}
+                            <div className="flex items-center gap-1 border-l border-slate-300 dark:border-slate-700 pl-3">
+                                <button
+                                    onClick={() => setShowBorders(!showBorders)}
+                                    className={`p-2 rounded-lg transition-all ${!showBorders ? 'bg-indigo-100 text-indigo-600 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                    title="Toggle Panel Borders"
+                                >
+                                    <BoxSelect className="w-4 h-4" />
+                                </button>
+                                <button
+                                    onClick={() => handleAddTool('box')}
+                                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 transition-all"
+                                    title="Add Empty Box"
+                                >
+                                    <Square className="w-4 h-4" />
+                                </button>
+                            </div>
+
                             <button 
                             onClick={handleDownload}
                             disabled={currentPanelIndex !== -1 || generatingCover}
@@ -1519,6 +1572,7 @@ const App: React.FC = () => {
                                                 styleMode={storyboard.styleMode}
                                                 renderMode={storyboard.renderMode}
                                                 isFreeMode={true}
+                                                showBorders={showBorders}
                                             />
 
                                             {/* Resize Handle Visual */}
@@ -1584,6 +1638,17 @@ const App: React.FC = () => {
                                         </div>
                                     </Rnd>
                                 ))}
+
+                                {/* Render Added Tools */}
+                                {addedTools.map(tool => (
+                                    <MangaTool
+                                        key={tool.id}
+                                        {...tool}
+                                        scale={scale}
+                                        onUpdate={handleUpdateTool}
+                                        onDelete={handleDeleteTool}
+                                    />
+                                ))}
                             </div>
                         ) : (
                             <div className="w-full flex flex-col gap-4">
@@ -1624,6 +1689,7 @@ const App: React.FC = () => {
                                             onRegenerate={handleRegeneratePanel}
                                             styleMode={storyboard.styleMode}
                                             renderMode={storyboard.renderMode}
+                                            showBorders={showBorders}
                                         />
                                     </div>
                                 ))}
