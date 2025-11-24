@@ -89,19 +89,18 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
       
       {/* Image Area */}
       {panel.status === 'completed' && panel.imageUrl ? (
-         <div
-             className="w-full h-full relative animate-fade-in"
-             style={{
-                backgroundImage: `url(${panel.imageUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                filter: styleMode === 'bw'
+         <div className="w-full h-full relative animate-fade-in overflow-hidden">
+            <img
+                src={panel.imageUrl}
+                alt={`Panel ${panel.id}`}
+                className="w-full h-full object-cover pointer-events-none select-none"
+                style={{
+                    filter: styleMode === 'bw'
                         ? 'grayscale(100%) contrast(1.15) brightness(1.05)' 
                         : 'none'
-             }}
-             aria-label={`Panel ${panel.id}`}
-             role="img"
-         />
+                }}
+            />
+         </div>
       ) : panel.status === 'generating' ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-black p-4 text-center">
               <Loader2 className="w-8 h-8 animate-spin mb-3 text-indigo-500" />
@@ -129,7 +128,7 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
 
       {/* Hover Actions */}
       {panel.status === 'completed' && (
-          <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+          <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-20" data-html2canvas-ignore="true">
             <button 
                 onClick={() => onRegenerate(panel)}
                 className="bg-white/90 backdrop-blur text-slate-800 p-2 rounded-full shadow-lg border border-slate-200 hover:scale-110 transition-transform hover:text-indigo-600 no-drag"

@@ -1381,14 +1381,20 @@ const App: React.FC = () => {
                                             )}
 
                                             {/* Hover Frame to indicate draggable */}
-                                            <div className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none" />
-                                            <div className="absolute top-3 left-3 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div
+                                                className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none"
+                                                data-html2canvas-ignore="true"
+                                            />
+                                            <div
+                                                className="absolute top-3 left-3 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                data-html2canvas-ignore="true"
+                                            >
                                                 Cover (Drag/Resize)
                                             </div>
 
                                             {/* Cover Reroll Button */}
                                             {storyboard.coverImageUrl && (
-                                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-50">
+                                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity z-50" data-html2canvas-ignore="true">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleRegenerateCoverImage(); }}
                                                         className="bg-white/90 backdrop-blur text-slate-800 p-2 rounded-full shadow-lg border border-slate-200 hover:scale-110 transition-transform hover:text-indigo-600"
@@ -1443,10 +1449,16 @@ const App: React.FC = () => {
                                             />
 
                                             {/* Resize Handle Visual */}
-                                            <div className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none" />
+                                            <div
+                                                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none"
+                                                data-html2canvas-ignore="true"
+                                            />
 
                                             {/* Move Indicator (Top Center) - Now acts as a drag handle */}
-                                            <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move">
+                                            <div
+                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move"
+                                                data-html2canvas-ignore="true"
+                                            >
                                                 <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
                                                     <Move className="w-3 h-3" />
                                                     <span className="font-bold">Drag to Move</span>
@@ -1454,7 +1466,7 @@ const App: React.FC = () => {
                                             </div>
 
                                             {/* Size Presets (Floating) - Toggleable on click */}
-                                            <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag">
+                                            <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag" data-html2canvas-ignore="true">
                                                 {activeSettingsPanel === idx ? (
                                                     <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
                                                         <button
