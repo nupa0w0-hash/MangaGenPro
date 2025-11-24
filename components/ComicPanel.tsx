@@ -8,9 +8,10 @@ interface Props {
   styleMode: StyleMode;
   renderMode?: RenderMode;
   isFreeMode?: boolean;
+  showBorders?: boolean;
 }
 
-const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay', isFreeMode = false }) => {
+const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMode = 'overlay', isFreeMode = false, showBorders = true }) => {
   // Determine aspect ratio styles based on panelSize
   // If in free canvas mode (dynamic template), we don't force aspect ratio via CSS
   // allowing the container (Rnd) to determine the size.
@@ -131,7 +132,7 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
   };
 
   return (
-    <div ref={containerRef} className={`relative w-full h-full bg-white border-[3px] border-black group ${aspectRatioClass} shadow-sm overflow-hidden transition-transform`}>
+    <div ref={containerRef} className={`relative w-full h-full bg-white ${showBorders ? 'border-[3px] border-black' : ''} group ${aspectRatioClass} shadow-sm overflow-hidden transition-transform`}>
       
       {/* Image Area */}
       {panel.status === 'completed' && panel.imageUrl ? (
