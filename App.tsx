@@ -13,7 +13,7 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus, Square, BoxSelect
+  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -25,11 +25,12 @@ type LayoutPanel = Panel & {
 
 interface MangaToolItem {
   id: number;
-  type: 'box';
+  type: 'box' | 'circle' | 'text' | 'bubble';
   x: number;
   y: number;
   width: number;
   height: number;
+  content?: string;
 }
 
 const App: React.FC = () => {
@@ -71,6 +72,7 @@ const App: React.FC = () => {
   // Manga Tools State
   const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
   const [showBorders, setShowBorders] = useState(true);
+  const [isToolboxOpen, setIsToolboxOpen] = useState(false);
 
   // Initialize Theme & Check API Key
   useEffect(() => {
@@ -579,20 +581,26 @@ const App: React.FC = () => {
   };
 
   // --- Manga Tool Handlers ---
-  const handleAddTool = (type: 'box') => {
+  const handleAddTool = (type: MangaToolItem['type']) => {
       const newTool: MangaToolItem = {
           id: Date.now(),
           type,
           x: 250, // Roughly center
           y: 200,
-          width: 200,
-          height: 100
+          width: type === 'text' ? 150 : 200,
+          height: type === 'text' ? 50 : 100,
+          content: type === 'text' ? '' : undefined
       };
       setAddedTools([...addedTools, newTool]);
+      if (window.innerWidth < 768) setIsToolboxOpen(false); // Close on mobile after select
   };
 
   const handleUpdateTool = (id: number, data: { x: number, y: number, width: number, height: number }) => {
       setAddedTools(prev => prev.map(tool => tool.id === id ? { ...tool, ...data } : tool));
+  };
+
+  const handleUpdateToolContent = (id: number, content: string) => {
+      setAddedTools(prev => prev.map(tool => tool.id === id ? { ...tool, content } : tool));
   };
 
   const handleDeleteTool = (id: number) => {
@@ -1404,22 +1412,62 @@ const App: React.FC = () => {
                                 <RefreshCcw className="w-3.5 h-3.5" /> Reset
                             </button>
 
-                            {/* Tool Controls */}
-                            <div className="flex items-center gap-1 border-l border-slate-300 dark:border-slate-700 pl-3">
+                            {/* Tool Controls (Collapsible) */}
+                            <div className="relative border-l border-slate-300 dark:border-slate-700 pl-3">
                                 <button
-                                    onClick={() => setShowBorders(!showBorders)}
-                                    className={`p-2 rounded-lg transition-all ${!showBorders ? 'bg-indigo-100 text-indigo-600 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                                    title="Toggle Panel Borders"
+                                    onClick={() => setIsToolboxOpen(!isToolboxOpen)}
+                                    className={`p-2 rounded-lg transition-all flex items-center gap-2 ${isToolboxOpen ? 'bg-indigo-100 text-indigo-600 dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                    title="Toggle Tools"
                                 >
-                                    <BoxSelect className="w-4 h-4" />
+                                    <Wrench className="w-4 h-4" />
+                                    <span className="text-xs font-bold hidden sm:inline">Tools</span>
                                 </button>
-                                <button
-                                    onClick={() => handleAddTool('box')}
-                                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-indigo-600 transition-all"
-                                    title="Add Empty Box"
-                                >
-                                    <Square className="w-4 h-4" />
-                                </button>
+
+                                {/* Dropdown / Collapsible Area */}
+                                {isToolboxOpen && (
+                                    <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xl p-2 flex flex-col gap-1 z-50 animate-fade-in min-w-[160px]">
+                                        <div className="text-[10px] font-bold text-slate-400 uppercase px-2 py-1">Canvas Tools</div>
+
+                                        <button
+                                            onClick={() => setShowBorders(!showBorders)}
+                                            className={`p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left ${!showBorders ? 'bg-indigo-50 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            <BoxSelect className="w-4 h-4" />
+                                            <span>{showBorders ? 'Hide Borders' : 'Show Borders'}</span>
+                                        </button>
+
+                                        <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
+
+                                        <button
+                                            onClick={() => handleAddTool('box')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <Square className="w-4 h-4" />
+                                            <span>Add Box</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleAddTool('circle')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <Circle className="w-4 h-4" />
+                                            <span>Add Circle</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleAddTool('bubble')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <MessageCircle className="w-4 h-4" />
+                                            <span>Add Bubble</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleAddTool('text')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <Type className="w-4 h-4" />
+                                            <span>Add Text</span>
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <button 
@@ -1646,6 +1694,7 @@ const App: React.FC = () => {
                                         {...tool}
                                         scale={scale}
                                         onUpdate={handleUpdateTool}
+                                        onContentChange={handleUpdateToolContent}
                                         onDelete={handleDeleteTool}
                                     />
                                 ))}
