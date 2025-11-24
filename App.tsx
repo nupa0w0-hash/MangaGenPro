@@ -25,12 +25,15 @@ type LayoutPanel = Panel & {
 
 interface MangaToolItem {
   id: number;
-  type: 'box' | 'circle' | 'text' | 'bubble';
+  type: 'box' | 'circle' | 'text' | 'bubble' | 'image';
   x: number;
   y: number;
   width: number;
   height: number;
   content?: string;
+  imageUrl?: string;
+  rotation?: number;
+  textStyle?: { fontWeight?: string, fontSize?: string, color?: string, fontFamily?: string };
 }
 
 const App: React.FC = () => {
@@ -68,6 +71,7 @@ const App: React.FC = () => {
   const [isRerollingCoverPrompt, setIsRerollingCoverPrompt] = useState(false);
   const [activeSettingsPanel, setActiveSettingsPanel] = useState<number | null>(null);
   const resultRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Manga Tools State
   const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
@@ -581,7 +585,7 @@ const App: React.FC = () => {
   };
 
   // --- Manga Tool Handlers ---
-  const handleAddTool = (type: MangaToolItem['type']) => {
+  const handleAddTool = (type: MangaToolItem['type'], imageUrl?: string) => {
       const newTool: MangaToolItem = {
           id: Date.now(),
           type,
@@ -589,13 +593,31 @@ const App: React.FC = () => {
           y: 200,
           width: type === 'text' ? 150 : 200,
           height: type === 'text' ? 50 : 100,
-          content: type === 'text' ? '' : undefined
+          content: type === 'text' ? '' : undefined,
+          imageUrl,
+          rotation: 0
       };
       setAddedTools([...addedTools, newTool]);
       if (window.innerWidth < 768) setIsToolboxOpen(false); // Close on mobile after select
   };
 
-  const handleUpdateTool = (id: number, data: { x: number, y: number, width: number, height: number }) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+          if (event.target?.result) {
+              handleAddTool('image', event.target.result as string);
+          }
+      };
+      reader.readAsDataURL(file);
+
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleUpdateTool = (id: number, data: { x: number, y: number, width: number, height: number, rotation?: number }) => {
       setAddedTools(prev => prev.map(tool => tool.id === id ? { ...tool, ...data } : tool));
   };
 
@@ -1466,9 +1488,23 @@ const App: React.FC = () => {
                                             <Type className="w-4 h-4" />
                                             <span>Add Text</span>
                                         </button>
+                                        <button
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <ImageIcon className="w-4 h-4" />
+                                            <span>Add Image</span>
+                                        </button>
                                     </div>
                                 )}
                             </div>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                            />
 
                             <button 
                             onClick={handleDownload}
