@@ -70,7 +70,7 @@ export const generateStoryboard = async (
     : "Korean Webtoon Style (Full Color, Vibrant, Digital Art, Clean Lines)";
 
   const panelCountInstruction = panelCount === 'unlimited'
-    ? "스토리를 충분히 표현할 수 있는 만큼의 컷(제한 없음)으로 구성하세요."
+    ? "스토리를 아주 상세하게 표현하여 **최소 31컷 이상**으로 구성하세요. 컷 수에 상한선은 없습니다."
     : `스토리를 정확히 **${panelCount}컷**으로 구성하세요.`;
 
   const prompt = `
