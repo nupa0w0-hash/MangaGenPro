@@ -191,11 +191,7 @@ const App: React.FC = () => {
   const initializeLayouts = () => {
       if (!storyboard) return;
 
-      // Adjust canvas width to fit within the double-padded container (800 - 32*4 = 672)
-      // Wrapper padding: 32px * 2, Inner padding: 32px * 2
       const canvasWidth = 672;
-      const containerWidth = 736; // 800 - 64 (outer p-8 + inner p-8 logic creates offset, actual space is 736)
-      const leftOffset = (containerWidth - canvasWidth) / 2; // ~32px to center the 672px grid in 736px space
 
       const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2; // 2 columns
@@ -207,7 +203,7 @@ const App: React.FC = () => {
       if ((storyboard.coverImagePrompt || storyboard.coverImageUrl) && !newCoverLayout) {
           // Default cover at top
           newCoverLayout = {
-              x: gap + leftOffset,
+              x: gap,
               y: gap,
               width: canvasWidth - (gap * 2), // Full width
               height: storyboard.coverAspectRatio === 'landscape'
@@ -251,7 +247,7 @@ const App: React.FC = () => {
               colHeights[1] = startY;
           }
 
-          const x = gap + (colIndex * (colWidth + gap)) + leftOffset;
+          const x = gap + (colIndex * (colWidth + gap));
           const y = colHeights[colIndex];
 
           // Update heights
@@ -281,8 +277,6 @@ const App: React.FC = () => {
 
       // Let's construct fully here to be safe
       const canvasWidth = 672;
-      const containerWidth = 736;
-      const leftOffset = (containerWidth - canvasWidth) / 2;
 
       const gap = 24;
       const colWidth = (canvasWidth - gap * 3) / 2;
@@ -292,7 +286,7 @@ const App: React.FC = () => {
       let newCoverLayout;
       if (storyboard.coverImagePrompt || storyboard.coverImageUrl) {
           newCoverLayout = {
-              x: gap + leftOffset,
+              x: gap,
               y: gap,
               width: canvasWidth - (gap * 2),
               height: storyboard.coverAspectRatio === 'landscape'
@@ -323,7 +317,7 @@ const App: React.FC = () => {
               colHeights[1] = startY;
           }
 
-          const x = gap + (colIndex * (colWidth + gap)) + leftOffset;
+          const x = gap + (colIndex * (colWidth + gap));
           const y = colHeights[colIndex];
 
           if (panel.panelSize === 'wide') {
@@ -617,6 +611,13 @@ const App: React.FC = () => {
         // its parent does. We are capturing the inner content purely)
         clone.style.transform = 'none';
         clone.style.minHeight = 'auto';
+
+        // Fix Centering for Export:
+        // Container is 800px. Content is 672px.
+        // We need 64px padding on each side to center it (800 - 672 = 128, 128/2 = 64).
+        // The original UI has p-8 (32px). We override it here.
+        clone.style.paddingLeft = '64px';
+        clone.style.paddingRight = '64px';
 
         // Explicitly set height to scrollHeight to ensure full capture
         const fullHeight = resultRef.current.scrollHeight;
