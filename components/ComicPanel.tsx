@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Panel, StyleMode, RenderMode } from '../types';
 import { RefreshCw, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -21,6 +21,52 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
         panel.panelSize === 'tall' ? 'aspect-[3/4]' :
         'aspect-square'
       );
+
+  // Image Scaling Logic
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imageStyle, setImageStyle] = useState<React.CSSProperties>({
+      width: 'auto',
+      height: 'auto',
+      maxWidth: 'none'
+  });
+
+  const updateImageStyle = () => {
+    const container = containerRef.current;
+    const img = imgRef.current;
+    if (!container || !img || !img.naturalWidth) return;
+
+    const containerRatio = container.clientWidth / container.clientHeight;
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+
+    // Simulate object-fit: cover
+    if (containerRatio > imgRatio) {
+        // Container is wider than image (relative to aspect), so match width
+        setImageStyle({
+            width: '100%',
+            height: 'auto',
+            maxWidth: 'none',
+            transform: 'translate(-50%, -50%)'
+        });
+    } else {
+        // Container is taller than image, so match height
+        setImageStyle({
+            width: 'auto',
+            height: '100%',
+            maxWidth: 'none',
+            transform: 'translate(-50%, -50%)'
+        });
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+        updateImageStyle();
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [panel.imageUrl]);
 
   // Bubble rendering logic
   const renderBubbles = () => {
@@ -85,24 +131,24 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
   };
 
   return (
-    <div className={`relative w-full h-full bg-white border-[3px] border-black group ${aspectRatioClass} shadow-sm overflow-hidden transition-transform`}>
+    <div ref={containerRef} className={`relative w-full h-full bg-white border-[3px] border-black group ${aspectRatioClass} shadow-sm overflow-hidden transition-transform`}>
       
       {/* Image Area */}
       {panel.status === 'completed' && panel.imageUrl ? (
          <div className="w-full h-full relative animate-fade-in overflow-hidden">
             {/*
-                We use manual CSS centering instead of simple object-fit: cover
-                because html2canvas often struggles with object-fit on mobile devices.
-                This ensures the image covers the container and centers itself robustly.
+                We use JS-calculated dimensions + Absolute Centering to simulate object-fit: cover.
+                This provides the most robust compatibility with html2canvas across Web and Mobile,
+                avoiding "zoomed in" issues (max-w-none without constraints) or "squashed" issues (fit-content).
             */}
             <img
+                ref={imgRef}
                 src={panel.imageUrl}
+                onLoad={updateImageStyle}
                 alt={`Panel ${panel.id}`}
-                className="absolute top-1/2 left-1/2 min-w-full min-h-full max-w-none pointer-events-none select-none"
+                className="absolute top-1/2 left-1/2 pointer-events-none select-none"
                 style={{
-                    transform: 'translate(-50%, -50%)',
-                    width: 'auto',
-                    height: 'auto',
+                    ...imageStyle,
                     filter: styleMode === 'bw'
                         ? 'grayscale(100%) contrast(1.15) brightness(1.05)' 
                         : 'none'
