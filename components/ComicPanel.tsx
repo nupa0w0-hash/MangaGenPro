@@ -90,11 +90,19 @@ const ComicPanel: React.FC<Props> = ({ panel, onRegenerate, styleMode, renderMod
       {/* Image Area */}
       {panel.status === 'completed' && panel.imageUrl ? (
          <div className="w-full h-full relative animate-fade-in overflow-hidden">
+            {/*
+                We use manual CSS centering instead of simple object-fit: cover
+                because html2canvas often struggles with object-fit on mobile devices.
+                This ensures the image covers the container and centers itself robustly.
+            */}
             <img
                 src={panel.imageUrl}
                 alt={`Panel ${panel.id}`}
-                className="w-full h-full object-cover pointer-events-none select-none"
+                className="absolute top-1/2 left-1/2 min-w-full min-h-full max-w-none pointer-events-none select-none"
                 style={{
+                    transform: 'translate(-50%, -50%)',
+                    width: 'auto',
+                    height: 'auto',
                     filter: styleMode === 'bw'
                         ? 'grayscale(100%) contrast(1.15) brightness(1.05)' 
                         : 'none'
