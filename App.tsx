@@ -4,13 +4,15 @@ import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookma
 import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript, regenerateCoverPrompt } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
+import CharacterEmotionStudio from './components/emotion-studio/CharacterEmotionStudio';
 import { Rnd } from 'react-rnd';
 
 import { 
   BookOpen, Sparkles, Layout, Image as ImageIcon, Loader2, ChevronRight, 
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
-  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2
+  Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
+  SmilePlus
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -24,6 +26,9 @@ const App: React.FC = () => {
   const [isApiReady, setIsApiReady] = useState(false);
   const [inputApiKey, setInputApiKey] = useState(''); // Input state for API Key
   
+  // App Mode State
+  const [appMode, setAppMode] = useState<'story' | 'character-studio'>('story');
+
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
@@ -817,34 +822,61 @@ const App: React.FC = () => {
         </div>
         
         {/* Navigation Tabs */}
-        <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50">
-          {[
-            { id: 'input', label: '1. 스토리', icon: PenTool },
-            { id: 'preview', label: '2. 콘티/수정', icon: Layout },
-            { id: 'result', label: '3. 완성', icon: ImageIcon }
-          ].map((tab) => (
-             <button 
-                key={tab.id}
-                onClick={() => {
-                   if (tab.id === 'preview' && !storyboard) return;
-                   if (tab.id === 'result' && !storyboard) return;
-                   setActiveTab(tab.id as any);
-                }}
-                disabled={(tab.id === 'preview' || tab.id === 'result') && !storyboard}
-                className={`relative flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                   activeTab === tab.id 
-                   ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm dark:shadow-md' 
-                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30'
-                }`}
-             >
-                <tab.icon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{tab.label}</span>
-             </button>
-          ))}
-        </div>
+        {appMode === 'story' ? (
+          <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50">
+            {[
+              { id: 'input', label: '1. 스토리', icon: PenTool },
+              { id: 'preview', label: '2. 콘티/수정', icon: Layout },
+              { id: 'result', label: '3. 완성', icon: ImageIcon }
+            ].map((tab) => (
+              <button
+                  key={tab.id}
+                  onClick={() => {
+                    if (tab.id === 'preview' && !storyboard) return;
+                    if (tab.id === 'result' && !storyboard) return;
+                    setActiveTab(tab.id as any);
+                  }}
+                  disabled={(tab.id === 'preview' || tab.id === 'result') && !storyboard}
+                  className={`relative flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    activeTab === tab.id
+                    ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white shadow-sm dark:shadow-md'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-30'
+                  }`}
+              >
+                  <tab.icon className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+           <div className="flex bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1 border border-slate-200 dark:border-slate-700/50">
+              <span className="relative flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold bg-white dark:bg-slate-700 text-purple-600 dark:text-white shadow-sm">
+                 <SmilePlus className="w-3.5 h-3.5" />
+                 Character Emotion Studio
+              </span>
+           </div>
+        )}
 
-        {/* Theme & Reset Key */}
-        <div className="flex gap-2">
+        {/* Mode Switcher & Tools */}
+        <div className="flex gap-2 items-center">
+            {/* Mode Toggle */}
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 mr-2">
+                <button
+                    onClick={() => setAppMode('story')}
+                    className={`p-2 rounded-md transition-all ${appMode === 'story' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Manga Story Mode"
+                >
+                    <BookOpen className="w-4 h-4" />
+                </button>
+                <button
+                    onClick={() => setAppMode('character-studio')}
+                    className={`p-2 rounded-md transition-all ${appMode === 'character-studio' ? 'bg-white dark:bg-slate-600 text-purple-600 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    title="Character Emotion Studio"
+                >
+                    <SmilePlus className="w-4 h-4" />
+                </button>
+            </div>
+
             <button 
                 onClick={() => {
                     if(confirm("API 키를 삭제하고 초기 화면으로 돌아가시겠습니까?")) {
@@ -868,44 +900,57 @@ const App: React.FC = () => {
       </header>
 
       <div className="flex flex-1 overflow-hidden relative">
-        {/* Sidebar */}
-        <aside 
-            className={`absolute md:relative z-20 h-full w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} md:translate-x-0 flex flex-col`}
-        >
-             <CharacterManager characters={characters} setCharacters={setCharacters} styleMode={styleMode} />
-             
-             {/* Bookmarks */}
-             <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors duration-300">
-                <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                        <FolderOpen className="w-3 h-3"/> Saved Stories
-                    </span>
-                    <button onClick={loadAutosave} className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors">
-                        <ArchiveRestore className="w-3 h-3" /> Auto-Load
-                    </button>
-                </div>
-                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
-                    {bookmarks.map(bm => (
-                        <div key={bm.id} className="group flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-all" onClick={() => loadBookmark(bm)}>
-                            <div className="min-w-0">
-                                <p className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate">{bm.title}</p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500">{bm.date}</p>
-                            </div>
-                            <button onClick={(e) => deleteBookmark(bm.id, e)} className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
-                    ))}
-                    {bookmarks.length === 0 && <p className="text-xs text-slate-400 dark:text-slate-600 text-center py-2">저장된 스토리가 없습니다.</p>}
-                </div>
-             </div>
-        </aside>
 
-        {/* Main Workspace */}
-        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative custom-scrollbar transition-colors duration-300">
-          
-          {/* TAB: INPUT */}
-          {activeTab === 'input' && (
+        {/* --------------------------------------------------------------------------------
+           MODE: CHARACTER EMOTION STUDIO
+           -------------------------------------------------------------------------------- */}
+        {appMode === 'character-studio' ? (
+           <div className="w-full h-full overflow-y-auto">
+              <CharacterEmotionStudio />
+           </div>
+        ) : (
+          /* --------------------------------------------------------------------------------
+             MODE: MANGA STORY
+             -------------------------------------------------------------------------------- */
+          <>
+            {/* Sidebar */}
+            <aside
+                className={`absolute md:relative z-20 h-full w-72 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 transition-all duration-300 ease-in-out ${showSidebar ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} md:translate-x-0 flex flex-col`}
+            >
+                <CharacterManager characters={characters} setCharacters={setCharacters} styleMode={styleMode} />
+
+                {/* Bookmarks */}
+                <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-colors duration-300">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                            <FolderOpen className="w-3 h-3"/> Saved Stories
+                        </span>
+                        <button onClick={loadAutosave} className="text-[10px] text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 flex items-center gap-1 transition-colors">
+                            <ArchiveRestore className="w-3 h-3" /> Auto-Load
+                        </button>
+                    </div>
+                    <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                        {bookmarks.map(bm => (
+                            <div key={bm.id} className="group flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 p-2 rounded-lg border border-transparent hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer transition-all" onClick={() => loadBookmark(bm)}>
+                                <div className="min-w-0">
+                                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium truncate">{bm.title}</p>
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500">{bm.date}</p>
+                                </div>
+                                <button onClick={(e) => deleteBookmark(bm.id, e)} className="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Trash2 className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                        {bookmarks.length === 0 && <p className="text-xs text-slate-400 dark:text-slate-600 text-center py-2">저장된 스토리가 없습니다.</p>}
+                    </div>
+                </div>
+            </aside>
+
+            {/* Main Workspace */}
+            <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950 relative custom-scrollbar transition-colors duration-300">
+
+            {/* TAB: INPUT */}
+            {activeTab === 'input' && (
             <div className="max-w-4xl mx-auto p-6 md:p-12 animate-fade-in pb-32">
                <div className="text-center mb-10">
                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">당신의 이야기를 만화로 만드세요</h2>
@@ -1256,11 +1301,11 @@ const App: React.FC = () => {
              </div>
           )}
 
-          {/* TAB: RESULT */}
-          {activeTab === 'result' && storyboard && (
-            <div className="w-full min-h-full bg-slate-100 dark:bg-slate-950 flex flex-col items-center animate-fade-in transition-colors duration-300">
-              
-              {/* Toolbar - Sticky */}
+            {/* TAB: RESULT */}
+            {activeTab === 'result' && storyboard && (
+              <div className="w-full min-h-full bg-slate-100 dark:bg-slate-950 flex flex-col items-center animate-fade-in transition-colors duration-300">
+
+                {/* Toolbar - Sticky */}
               <div className="sticky top-0 z-40 w-full flex justify-center p-4 md:p-6 bg-slate-100/90 dark:bg-slate-950/90 backdrop-blur-md">
                  <div className="w-full max-w-[800px]">
                      <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-xl">
@@ -1570,11 +1615,13 @@ const App: React.FC = () => {
                       </div>
                   </div>
                 </div>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-        </main>
+            </main>
+          </>
+        )}
       </div>
     </div>
   );
