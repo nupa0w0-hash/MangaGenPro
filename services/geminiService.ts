@@ -56,7 +56,8 @@ export const generateStoryboard = async (
   characters: Character[],
   coverAspectRatio: 'landscape' | 'portrait',
   styleMode: StyleMode,
-  renderMode: RenderMode = 'overlay'
+  renderMode: RenderMode = 'overlay',
+  panelCount: number | 'unlimited' = 8
 ): Promise<Storyboard> => {
   const ai = getAiClient();
 
@@ -67,6 +68,10 @@ export const generateStoryboard = async (
   const styleInstruction = styleMode === 'bw' 
     ? "Japanese Manga Style (Black and White, Screen Tones, High Contrast)" 
     : "Korean Webtoon Style (Full Color, Vibrant, Digital Art, Clean Lines)";
+
+  const panelCountInstruction = panelCount === 'unlimited'
+    ? "스토리를 충분히 표현할 수 있는 만큼의 컷(제한 없음)으로 구성하세요."
+    : `스토리를 정확히 **${panelCount}컷**으로 구성하세요.`;
 
   const prompt = `
     당신은 세계 최고의 만화 콘티 작가입니다.
@@ -87,7 +92,7 @@ export const generateStoryboard = async (
        - 의상/헤어 변경이 없는 경우 \`costumeOverride\` 필드를 반드시 비워두세요(null/empty).
     
     [지시사항]
-    1. 스토리를 6~10컷의 역동적인 만화 패널로 구성하세요.
+    1. ${panelCountInstruction}
     2. **${styleInstruction}**의 연출을 사용하세요.
     3. **Visual Prompt Detail:** visualPromptEn은 AI가 이미지를 생성하는 정보입니다.
        - **주의:** 의상이나 헤어스타일 묘사는 \`costumeOverride\` 필드에만 작성하고, \`visualPromptEn\`에는 구도, 조명, 표정, 배경, 액션 위주로 작성하세요.
