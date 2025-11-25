@@ -13,7 +13,7 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench, Zap, Sun as SunIcon
+  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -23,9 +23,9 @@ type LayoutPanel = Panel & {
   displaySize: 'square' | 'wide' | 'tall';
 };
 
-export interface MangaToolItem {
+interface MangaToolItem {
   id: number;
-  type: 'box' | 'circle' | 'text' | 'bubble' | 'image' | 'speed-lines' | 'focus-lines';
+  type: 'box' | 'circle' | 'text' | 'bubble' | 'image';
   x: number;
   y: number;
   width: number;
@@ -77,7 +77,6 @@ const App: React.FC = () => {
   const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
   const [showBorders, setShowBorders] = useState(true);
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
-  const [selectedPanelId, setSelectedPanelId] = useState<number | null>(null);
 
   // Initialize Theme & Check API Key
   useEffect(() => {
@@ -1490,20 +1489,6 @@ const App: React.FC = () => {
                                             <span>Add Text</span>
                                         </button>
                                         <button
-                                            onClick={() => handleAddTool('speed-lines')}
-                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                                        >
-                                            <Zap className="w-4 h-4" />
-                                            <span>Speed Lines</span>
-                                        </button>
-                                        <button
-                                            onClick={() => handleAddTool('focus-lines')}
-                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
-                                        >
-                                            <SunIcon className="w-4 h-4" />
-                                            <span>Focus Lines</span>
-                                        </button>
-                                        <button
                                             onClick={() => fileInputRef.current?.click()}
                                             className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                                         >
@@ -1652,24 +1637,11 @@ const App: React.FC = () => {
                                                 ...position,
                                             });
                                         }}
-                                        onMouseDown={(e) => {
-                                            // Don't deselect if clicking inside
-                                            e.stopPropagation();
-                                            bringToFront(idx);
-                                        }}
-                                        onTouchStart={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedPanelId(panel.id);
-                                            bringToFront(idx);
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedPanelId(panel.id);
-                                        }}
+                                        onMouseDown={() => bringToFront(idx)}
                                         style={{ zIndex: panel.layout?.zIndex || 1 }}
                                         scale={scale}
                                         bounds="parent"
-                                        className={`group/panel-container ${selectedPanelId === panel.id ? 'z-20' : ''}`}
+                                        className="group/panel-container"
                                         enableUserSelectHack={false}
                                         dragHandleClassName="drag-handle"
                                         cancel=".no-drag"
@@ -1677,7 +1649,7 @@ const App: React.FC = () => {
                                             bottomRight: { cursor: 'se-resize', width: 40, height: 40, bottom: -10, right: -10, background: 'transparent' }
                                         }}
                                     >
-                                        <div className={`w-full h-full relative shadow-lg hover:shadow-xl transition-shadow drag-handle cursor-move ${selectedPanelId === panel.id ? 'ring-2 ring-indigo-500' : ''}`}>
+                                        <div className="w-full h-full relative shadow-lg hover:shadow-xl transition-shadow drag-handle cursor-move">
                                             <ComicPanel
                                                 panel={{...panel, panelSize: 'square'}} // Aspect ratio handled by Rnd dimensions now
                                                 onRegenerate={handleRegeneratePanel}
@@ -1689,13 +1661,13 @@ const App: React.FC = () => {
 
                                             {/* Resize Handle Visual */}
                                             <div
-                                                className={`absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize transition-opacity z-50 pointer-events-none ${selectedPanelId === panel.id ? 'opacity-100' : 'opacity-0 group-hover/panel-container:opacity-100'}`}
+                                                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none"
                                                 data-html2canvas-ignore="true"
                                             />
 
                                             {/* Move Indicator (Top Center) - Now acts as a drag handle */}
                                             <div
-                                                className={`absolute top-2 left-1/2 -translate-x-1/2 transition-opacity z-50 drag-handle cursor-move ${selectedPanelId === panel.id ? 'opacity-100' : 'opacity-0 group-hover/panel-container:opacity-100'}`}
+                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move"
                                                 data-html2canvas-ignore="true"
                                             >
                                                 <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
