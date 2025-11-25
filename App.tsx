@@ -13,7 +13,7 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench
+  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench, EyeOff
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -77,6 +77,7 @@ const App: React.FC = () => {
   const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
   const [showBorders, setShowBorders] = useState(true);
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
+  const [showLayoutControls, setShowLayoutControls] = useState(true);
 
   // Initialize Theme & Check API Key
   useEffect(() => {
@@ -1458,6 +1459,14 @@ const App: React.FC = () => {
                                             <span>{showBorders ? 'Hide Borders' : 'Show Borders'}</span>
                                         </button>
 
+                                        <button
+                                            onClick={() => setShowLayoutControls(!showLayoutControls)}
+                                            className={`p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left ${!showLayoutControls ? 'bg-indigo-50 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            {showLayoutControls ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            <span>{showLayoutControls ? 'Hide Layout Controls' : 'Show Layout Controls'}</span>
+                                        </button>
+
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
 
                                         <button
@@ -1561,6 +1570,8 @@ const App: React.FC = () => {
                                                 ...position,
                                             });
                                         }}
+                                        disableDragging={!showLayoutControls}
+                                        enableResizing={showLayoutControls}
                                         scale={scale}
                                         bounds="parent"
                                         className="group/cover-container"
@@ -1591,16 +1602,20 @@ const App: React.FC = () => {
                                             )}
 
                                             {/* Hover Frame to indicate draggable */}
-                                            <div
-                                                className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none"
-                                                data-html2canvas-ignore="true"
-                                            />
-                                            <div
-                                                className="absolute top-3 left-3 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                                                data-html2canvas-ignore="true"
-                                            >
-                                                Cover (Drag/Resize)
-                                            </div>
+                                            {showLayoutControls && (
+                                                <>
+                                                    <div
+                                                        className="absolute inset-0 border-2 border-indigo-500/0 group-hover:border-indigo-500/50 transition-colors pointer-events-none"
+                                                        data-html2canvas-ignore="true"
+                                                    />
+                                                    <div
+                                                        className="absolute top-3 left-3 bg-indigo-500 text-white text-[10px] px-2 py-1 rounded opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                                        data-html2canvas-ignore="true"
+                                                    >
+                                                        Cover (Drag/Resize)
+                                                    </div>
+                                                </>
+                                            )}
 
                                             {/* Cover Reroll Button */}
                                             {storyboard.coverImageUrl && (
@@ -1641,6 +1656,8 @@ const App: React.FC = () => {
                                         style={{ zIndex: panel.layout?.zIndex || 1 }}
                                         scale={scale}
                                         bounds="parent"
+                                        disableDragging={!showLayoutControls}
+                                        enableResizing={showLayoutControls}
                                         className="group/panel-container"
                                         enableUserSelectHack={false}
                                         dragHandleClassName="drag-handle"
@@ -1660,65 +1677,71 @@ const App: React.FC = () => {
                                             />
 
                                             {/* Resize Handle Visual */}
-                                            <div
-                                                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none"
-                                                data-html2canvas-ignore="true"
-                                            />
+                                            {showLayoutControls && (
+                                                <div
+                                                    className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none"
+                                                    data-html2canvas-ignore="true"
+                                                />
+                                            )}
 
                                             {/* Move Indicator (Top Center) - Now acts as a drag handle */}
-                                            <div
-                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move"
-                                                data-html2canvas-ignore="true"
-                                            >
-                                                <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
-                                                    <Move className="w-3 h-3" />
-                                                    <span className="font-bold">Drag to Move</span>
+                                            {showLayoutControls && (
+                                                <div
+                                                    className="absolute top-2 left-1/2 -translate-x-1/2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move"
+                                                    data-html2canvas-ignore="true"
+                                                >
+                                                    <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
+                                                        <Move className="w-3 h-3" />
+                                                        <span className="font-bold">Drag to Move</span>
+                                                    </div>
                                                 </div>
-                                            </div>
+                                            )}
 
                                             {/* Size Presets (Floating) - Toggleable on click */}
-                                            <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag" data-html2canvas-ignore="true">
-                                                {activeSettingsPanel === idx ? (
-                                                    <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
+                                            {showLayoutControls && (
+                                                <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag" data-html2canvas-ignore="true">
+                                                    {activeSettingsPanel === idx ? (
+                                                        <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
+                                                                className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
+                                                                title="Square (300x300)"
+                                                            >
+                                                                <div className="w-3 h-3 border border-current"></div>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); setActiveSettingsPanel(null); }}
+                                                                className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
+                                                                title="Wide (616x300)"
+                                                            >
+                                                                <div className="w-5 h-3 border border-current"></div>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); setActiveSettingsPanel(null); }}
+                                                                className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
+                                                                title="Tall (300x450)"
+                                                            >
+                                                                <div className="w-3 h-5 border border-current"></div>
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(null); }}
+                                                                className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-400 no-drag"
+                                                                aria-label="Close layout settings"
+                                                            >
+                                                                <X className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
                                                         <button
-                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
-                                                            title="Square (300x300)"
+                                                            onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
+                                                            className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 no-drag"
+                                                            aria-label="Open layout settings"
                                                         >
-                                                            <div className="w-3 h-3 border border-current"></div>
+                                                           <Settings2 className="w-4 h-4" />
                                                         </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 616, height: 300 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
-                                                            title="Wide (616x300)"
-                                                        >
-                                                            <div className="w-5 h-3 border border-current"></div>
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 450 }); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
-                                                            title="Tall (300x450)"
-                                                        >
-                                                            <div className="w-3 h-5 border border-current"></div>
-                                                        </button>
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(null); }}
-                                                            className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-400 no-drag"
-                                                            aria-label="Close layout settings"
-                                                        >
-                                                            <X className="w-3 h-3" />
-                                                        </button>
-                                                    </div>
-                                                ) : (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
-                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 no-drag"
-                                                        aria-label="Open layout settings"
-                                                    >
-                                                       <Settings2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                            </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </Rnd>
                                 ))}
