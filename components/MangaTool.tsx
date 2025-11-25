@@ -4,7 +4,7 @@ import { X, Move, RotateCw } from 'lucide-react';
 
 export interface MangaToolProps {
   id: number;
-  type: 'box' | 'circle' | 'text' | 'bubble' | 'image';
+  type: 'box' | 'circle' | 'text' | 'bubble' | 'image' | 'speed-lines' | 'focus-lines';
   x: number;
   y: number;
   width: number;
@@ -37,10 +37,11 @@ const MangaTool: React.FC<MangaToolProps> = ({
 }) => {
   const rotationRef = useRef<HTMLDivElement>(null);
   const rndRef = useRef<Rnd>(null);
+  const [isRotating, setIsRotating] = React.useState(false);
 
   // Rotation Logic
   useEffect(() => {
-    const handleRotate = (e: MouseEvent) => {
+    const handleRotate = (e: MouseEvent | TouchEvent) => {
        if (!rotationRef.current || !rndRef.current) return;
        // We are dragging the handle.
        // Calculate center of the element
@@ -53,7 +54,16 @@ const MangaTool: React.FC<MangaToolProps> = ({
        const centerX = rect.left + rect.width / 2;
        const centerY = rect.top + rect.height / 2;
 
-       const angleRad = Math.atan2(e.clientY - centerY, e.clientX - centerX);
+       let clientX, clientY;
+       if (window.TouchEvent && e instanceof TouchEvent) {
+          clientX = e.touches[0].clientX;
+          clientY = e.touches[0].clientY;
+       } else {
+          clientX = (e as MouseEvent).clientX;
+          clientY = (e as MouseEvent).clientY;
+       }
+
+       const angleRad = Math.atan2(clientY - centerY, clientX - centerX);
        let angleDeg = angleRad * (180 / Math.PI);
 
        // Snap to 45 degrees if Shift is held? (Optional enhancement)
@@ -69,26 +79,41 @@ const MangaTool: React.FC<MangaToolProps> = ({
        onUpdate(id, { x, y, width, height, rotation: angleDeg });
     };
 
-    const handleMouseUp = () => {
+    const handleEnd = () => {
+        setIsRotating(false);
         document.removeEventListener('mousemove', handleRotate);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('mouseup', handleEnd);
+        document.removeEventListener('touchmove', handleRotate);
+        document.removeEventListener('touchend', handleEnd);
     };
 
-    const handleMouseDown = (e: React.MouseEvent) => {
+    const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
         e.stopPropagation(); // Prevent drag
-        document.addEventListener('mousemove', handleRotate);
-        document.addEventListener('mouseup', handleMouseUp);
+        setIsRotating(true);
+        if (window.TouchEvent && e.nativeEvent instanceof TouchEvent) {
+           document.addEventListener('touchmove', handleRotate, { passive: false });
+           document.addEventListener('touchend', handleEnd);
+        } else {
+           document.addEventListener('mousemove', handleRotate);
+           document.addEventListener('mouseup', handleEnd);
+        }
     };
 
     const handleEl = rotationRef.current;
     if (handleEl) {
-        handleEl.addEventListener('mousedown', handleMouseDown as any);
+        handleEl.addEventListener('mousedown', handleStart as any);
+        handleEl.addEventListener('touchstart', handleStart as any);
     }
 
     return () => {
-        if (handleEl) handleEl.removeEventListener('mousedown', handleMouseDown as any);
+        if (handleEl) {
+           handleEl.removeEventListener('mousedown', handleStart as any);
+           handleEl.removeEventListener('touchstart', handleStart as any);
+        }
         document.removeEventListener('mousemove', handleRotate);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener('mouseup', handleEnd);
+        document.removeEventListener('touchmove', handleRotate);
+        document.removeEventListener('touchend', handleEnd);
     };
   }, [id, x, y, width, height, onUpdate]);
 
@@ -97,6 +122,7 @@ const MangaTool: React.FC<MangaToolProps> = ({
       ref={rndRef}
       size={{ width, height }}
       position={{ x, y }}
+      disableDragging={isRotating}
       onDragStop={(_e, d) => onUpdate(id, { x: d.x, y: d.y, width, height, rotation })}
       onResizeStop={(_e, _direction, ref, _delta, position) => {
         onUpdate(id, {
@@ -108,7 +134,7 @@ const MangaTool: React.FC<MangaToolProps> = ({
       }}
       scale={scale}
       bounds="parent"
-      className="group/tool-container z-[50]"
+  className="group/tool-container z-[100]"
       dragHandleClassName="drag-handle-tool"
       cancel=".no-drag"
       resizeHandleStyles={{
@@ -151,6 +177,38 @@ const MangaTool: React.FC<MangaToolProps> = ({
                />
             )}
 
+            {/* Speed Lines */}
+            {type === 'speed-lines' && (
+                <div className="w-full h-full overflow-hidden">
+                    <svg width="100%" height="100%" preserveAspectRatio="none">
+                        <defs>
+                            <pattern id="speedLinesPattern" width="20" height="100%" patternUnits="userSpaceOnUse" patternTransform="rotate(90)">
+                                <line x1="10" y1="0" x2="10" y2="100%" stroke="black" strokeWidth="2" strokeDasharray="20 10" />
+                            </pattern>
+                        </defs>
+                        <rect width="100%" height="100%" fill="url(#speedLinesPattern)" opacity="0.6" />
+                    </svg>
+                </div>
+            )}
+
+            {/* Focus Lines (Sunburst) */}
+            {type === 'focus-lines' && (
+                <div className="w-full h-full overflow-hidden">
+                    <svg viewBox="0 0 200 200" width="100%" height="100%" preserveAspectRatio="none">
+                        <g transform="translate(100, 100)">
+                             {[...Array(36)].map((_, i) => (
+                                 <path
+                                    key={i}
+                                    d="M0,0 L10,-100 L-10,-100 Z"
+                                    fill="black"
+                                    transform={`rotate(${i * 10}) translate(0, 40)`}
+                                 />
+                             ))}
+                        </g>
+                    </svg>
+                </div>
+            )}
+
             {/* Text Area */}
             {type === 'text' && (
                 <textarea
@@ -173,12 +231,12 @@ const MangaTool: React.FC<MangaToolProps> = ({
         {/* Rotation Handle (Sticks out top) */}
         <div
              ref={rotationRef}
-             className="absolute -top-8 left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing opacity-0 group-hover/tool-container:opacity-100 transition-opacity z-50 no-drag"
+             className="absolute -top-8 left-1/2 -translate-x-1/2 cursor-grab active:cursor-grabbing opacity-0 group-hover/tool-container:opacity-100 transition-opacity z-50 no-drag touch-none"
              data-html2canvas-ignore="true"
              title="Rotate"
         >
-             <div className="bg-white text-slate-600 p-1.5 rounded-full shadow-md border border-slate-200 hover:text-indigo-600 hover:border-indigo-500 transition-colors">
-                 <RotateCw className="w-3.5 h-3.5" />
+             <div className="bg-white text-slate-600 p-2 rounded-full shadow-md border border-slate-200 hover:text-indigo-600 hover:border-indigo-500 transition-colors">
+                 <RotateCw className="w-4 h-4" />
              </div>
              {/* Connector Line */}
              <div className="w-px h-3 bg-indigo-500/50 mx-auto"></div>
