@@ -13,7 +13,7 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench
+  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench, Zap, Sun as SunIcon
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -23,9 +23,9 @@ type LayoutPanel = Panel & {
   displaySize: 'square' | 'wide' | 'tall';
 };
 
-interface MangaToolItem {
+export interface MangaToolItem {
   id: number;
-  type: 'box' | 'circle' | 'text' | 'bubble' | 'image';
+  type: 'box' | 'circle' | 'text' | 'bubble' | 'image' | 'speed-lines' | 'focus-lines';
   x: number;
   y: number;
   width: number;
@@ -76,6 +76,7 @@ const App: React.FC = () => {
   // Manga Tools State
   const [addedTools, setAddedTools] = useState<MangaToolItem[]>([]);
   const [showBorders, setShowBorders] = useState(true);
+  const [showLayoutControls, setShowLayoutControls] = useState(true);
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
 
   // Initialize Theme & Check API Key
@@ -802,8 +803,15 @@ const App: React.FC = () => {
   const bringToFront = (index: number) => {
       if (!storyboard) return;
       const newPanels = [...storyboard.panels];
-      // Find max zIndex
-      const maxZ = Math.max(...newPanels.map(p => p.layout?.zIndex || 0), 0);
+      const currentZ = newPanels[index].layout?.zIndex || 0;
+
+      // Find max zIndex among OTHER panels
+      const otherPanels = newPanels.filter((_, i) => i !== index);
+      const maxZ = Math.max(...otherPanels.map(p => p.layout?.zIndex || 0), 0);
+
+      // If current is already higher than all others, do nothing
+      if (currentZ > maxZ) return;
+
       if (newPanels[index].layout) {
           newPanels[index].layout = { ...newPanels[index].layout!, zIndex: maxZ + 1 };
           setStoryboard({ ...storyboard, panels: newPanels });
@@ -1458,6 +1466,14 @@ const App: React.FC = () => {
                                             <span>{showBorders ? 'Hide Borders' : 'Show Borders'}</span>
                                         </button>
 
+                                        <button
+                                            onClick={() => setShowLayoutControls(!showLayoutControls)}
+                                            className={`p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left ${!showLayoutControls ? 'bg-indigo-50 text-indigo-600 dark:bg-slate-800 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            <Move className="w-4 h-4" />
+                                            <span>{showLayoutControls ? 'Hide Controls' : 'Show Controls'}</span>
+                                        </button>
+
                                         <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"></div>
 
                                         <button
@@ -1487,6 +1503,20 @@ const App: React.FC = () => {
                                         >
                                             <Type className="w-4 h-4" />
                                             <span>Add Text</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleAddTool('speed-lines')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <Zap className="w-4 h-4" />
+                                            <span>Speed Lines</span>
+                                        </button>
+                                        <button
+                                            onClick={() => handleAddTool('focus-lines')}
+                                            className="p-2 rounded-lg transition-all flex items-center gap-3 text-xs font-medium w-full text-left text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        >
+                                            <SunIcon className="w-4 h-4" />
+                                            <span>Focus Lines</span>
                                         </button>
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
@@ -1637,7 +1667,14 @@ const App: React.FC = () => {
                                                 ...position,
                                             });
                                         }}
-                                        onMouseDown={() => bringToFront(idx)}
+                                        onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            bringToFront(idx);
+                                        }}
+                                        onTouchStart={(e) => {
+                                            e.stopPropagation();
+                                            bringToFront(idx);
+                                        }}
                                         style={{ zIndex: panel.layout?.zIndex || 1 }}
                                         scale={scale}
                                         bounds="parent"
@@ -1661,13 +1698,13 @@ const App: React.FC = () => {
 
                                             {/* Resize Handle Visual */}
                                             <div
-                                                className="absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize opacity-0 group-hover/panel-container:opacity-100 transition-opacity z-50 pointer-events-none"
+                                                className={`absolute bottom-0 right-0 w-4 h-4 bg-indigo-500/50 rounded-tl-lg cursor-se-resize transition-opacity z-50 pointer-events-none ${!showLayoutControls ? 'opacity-0' : 'opacity-0 group-hover/panel-container:opacity-100'}`}
                                                 data-html2canvas-ignore="true"
                                             />
 
                                             {/* Move Indicator (Top Center) - Now acts as a drag handle */}
                                             <div
-                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 transition-opacity z-50 drag-handle cursor-move"
+                                                className={`absolute top-2 left-1/2 -translate-x-1/2 transition-opacity z-50 drag-handle cursor-move ${!showLayoutControls ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover/panel-container:opacity-100'}`}
                                                 data-html2canvas-ignore="true"
                                             >
                                                 <div className="bg-indigo-600/90 text-white text-[10px] px-2 py-1 rounded-full shadow-md flex items-center gap-1 backdrop-blur-sm">
@@ -1679,7 +1716,7 @@ const App: React.FC = () => {
                                             {/* Size Presets (Floating) - Toggleable on click */}
                                             <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag" data-html2canvas-ignore="true">
                                                 {activeSettingsPanel === idx ? (
-                                                    <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
+                                                    <div className={`bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag transition-opacity ${!showLayoutControls ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
                                                             className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
@@ -1712,7 +1749,7 @@ const App: React.FC = () => {
                                                 ) : (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
-                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 no-drag"
+                                                            className={`bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors no-drag ${!showLayoutControls ? 'opacity-0 pointer-events-none' : 'opacity-0 group-hover/panel-container:opacity-100'}`}
                                                         aria-label="Open layout settings"
                                                     >
                                                        <Settings2 className="w-4 h-4" />
