@@ -5,6 +5,7 @@ import { generateStoryboard, generatePanelImage, generateCoverImage, regenerateP
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
 import CharacterEmotionStudio from './components/emotion-studio/CharacterEmotionStudio';
+import ReferenceStudio from './components/reference-studio/ReferenceStudio';
 import MangaTool from './components/MangaTool';
 import { Rnd } from 'react-rnd';
 
@@ -13,7 +14,8 @@ import {
   PenTool, Download, Monitor, Edit3, Trash2, Plus, 
   Save, FolderOpen, RefreshCcw, RefreshCw, Palette, XCircle, FilePlus, ArchiveRestore,
   Menu, X, MessageSquare, Quote, Eye, Sun, Moon, Key, Move, Settings2,
-  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench, EyeOff
+  SmilePlus, Square, BoxSelect, Circle, Type, MessageCircle, Wrench, EyeOff,
+  Images
 } from 'lucide-react';
 
 // Extension of Panel type for layout processing
@@ -41,7 +43,7 @@ const App: React.FC = () => {
   const [inputApiKey, setInputApiKey] = useState(''); // Input state for API Key
   
   // App Mode State
-  const [appMode, setAppMode] = useState<'story' | 'character-studio'>('story');
+  const [appMode, setAppMode] = useState<'story' | 'character-studio' | 'reference-studio'>('story');
 
   // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>('dark');
@@ -52,6 +54,7 @@ const App: React.FC = () => {
   const [storyboard, setStoryboard] = useState<Storyboard | null>(null);
   const [coverRatio, setCoverRatio] = useState<'landscape' | 'portrait'>('landscape');
   const [styleMode, setStyleMode] = useState<StyleMode>('bw');
+  const [customStyle, setCustomStyle] = useState('');
   const [renderMode, setRenderMode] = useState<RenderMode>('overlay');
   const [pageTemplate, setPageTemplate] = useState<PageTemplate>('dynamic');
   const [panelCount, setPanelCount] = useState<number | 'unlimited'>(8);
@@ -64,6 +67,7 @@ const App: React.FC = () => {
   const [isRerollingPanel, setIsRerollingPanel] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'input' | 'preview' | 'result'>('input');
   const [showSidebar, setShowSidebar] = useState(true);
+  const [isModeMenuOpen, setIsModeMenuOpen] = useState(false);
   
   // Generation State
   const [currentPanelIndex, setCurrentPanelIndex] = useState<number>(-1); 
@@ -448,7 +452,7 @@ const App: React.FC = () => {
 
     setIsScripting(true);
     try {
-      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, renderMode, panelCount);
+      const result = await generateStoryboard(storyLog, characters, coverRatio, styleMode, customStyle, renderMode, panelCount);
 
       // Ensure no layout data is present to force fresh initialization (Auto-Reset)
       const cleanResult: Storyboard = {
@@ -524,7 +528,7 @@ const App: React.FC = () => {
       if (!storyboard || !storyboard.coverImagePrompt) return;
       setGeneratingCover(true);
       try {
-          const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, storyboard.styleMode);
+          const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, storyboard.styleMode, customStyle);
           setStoryboard(prev => prev ? { ...prev, coverImageUrl: coverUrl } : null);
       } catch (e) {
           console.error(e);
@@ -630,7 +634,7 @@ const App: React.FC = () => {
       setAddedTools(prev => prev.filter(tool => tool.id !== id));
   };
 
-  const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode, currentRenderMode: RenderMode) => {
+  const generateSinglePanel = useCallback(async (panel: Panel, allChars: Character[], currentStyle: StyleMode, currentCustomStyle: string, currentRenderMode: RenderMode) => {
      setStoryboard(prev => {
         if (!prev) return null;
         return {
@@ -640,7 +644,7 @@ const App: React.FC = () => {
      });
 
      try {
-        const imageUrl = await generatePanelImage(panel, allChars, currentStyle, currentRenderMode);
+        const imageUrl = await generatePanelImage(panel, allChars, currentStyle, currentCustomStyle, currentRenderMode);
         setStoryboard(prev => {
             if (!prev) return null;
             return {
@@ -733,11 +737,12 @@ const App: React.FC = () => {
     setActiveTab('result');
     
     const currentStyle = storyboard.styleMode;
+    const currentCustomStyle = customStyle;
     const currentRenderMode = storyboard.renderMode;
     if (storyboard.coverImagePrompt && !storyboard.coverImageUrl) {
       setGeneratingCover(true);
       try {
-        const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, currentStyle);
+        const coverUrl = await generateCoverImage(storyboard.coverImagePrompt, characters, storyboard.coverAspectRatio, currentStyle, currentCustomStyle);
         setStoryboard(prev => prev ? { ...prev, coverImageUrl: coverUrl } : null);
       } catch (e) { console.error("Cover failed", e); } 
       finally { setGeneratingCover(false); }
@@ -750,7 +755,7 @@ const App: React.FC = () => {
     for (let i = 0; i < panels.length; i++) {
        setCurrentPanelIndex(i);
        if (panels[i].status !== 'completed') {
-          await generateSinglePanel(panels[i], characters, currentStyle, currentRenderMode);
+          await generateSinglePanel(panels[i], characters, currentStyle, currentCustomStyle, currentRenderMode);
        }
     }
     setCurrentPanelIndex(-1);
@@ -758,7 +763,7 @@ const App: React.FC = () => {
 
   const handleRegeneratePanel = async (panel: Panel) => {
     if (!storyboard) return;
-    await generateSinglePanel(panel, characters, storyboard.styleMode, storyboard.renderMode);
+    await generateSinglePanel(panel, characters, storyboard.styleMode, customStyle, storyboard.renderMode);
   };
 
   const calculateStrictLayout = (): LayoutPanel[] => {
@@ -926,22 +931,33 @@ const App: React.FC = () => {
 
         {/* Mode Switcher & Tools */}
         <div className="flex gap-2 items-center">
-            {/* Mode Toggle */}
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg border border-slate-200 dark:border-slate-700 mr-2">
+            {/* Mode Dropdown */}
+            <div className="relative">
                 <button
-                    onClick={() => setAppMode('story')}
-                    className={`p-2 rounded-md transition-all ${appMode === 'story' ? 'bg-white dark:bg-slate-600 text-indigo-600 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    title="Manga Story Mode"
+                    onClick={() => setIsModeMenuOpen(!isModeMenuOpen)}
+                    className="flex items-center gap-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-colors"
                 >
-                    <BookOpen className="w-4 h-4" />
+                    {appMode === 'story' && <BookOpen className="w-4 h-4 text-indigo-500" />}
+                    {appMode === 'character-studio' && <SmilePlus className="w-4 h-4 text-purple-500" />}
+                    {appMode === 'reference-studio' && <Images className="w-4 h-4 text-green-500" />}
+                    <span className="text-xs font-bold hidden sm:inline">
+                        {appMode === 'story' ? 'Story Mode' : appMode === 'character-studio' ? 'Emotion Studio' : 'Reference Studio'}
+                    </span>
+                    <ChevronRight className={`w-3 h-3 transition-transform ${isModeMenuOpen ? 'rotate-90' : ''}`} />
                 </button>
-                <button
-                    onClick={() => setAppMode('character-studio')}
-                    className={`p-2 rounded-md transition-all ${appMode === 'character-studio' ? 'bg-white dark:bg-slate-600 text-purple-600 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                    title="Character Emotion Studio"
-                >
-                    <SmilePlus className="w-4 h-4" />
-                </button>
+                {isModeMenuOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-lg p-1 z-50">
+                        <button onClick={() => { setAppMode('story'); setIsModeMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
+                            <BookOpen className="w-4 h-4 text-indigo-500" /> Story Mode
+                        </button>
+                        <button onClick={() => { setAppMode('character-studio'); setIsModeMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
+                            <SmilePlus className="w-4 h-4 text-purple-500" /> Emotion Studio
+                        </button>
+                        <button onClick={() => { setAppMode('reference-studio'); setIsModeMenuOpen(false); }} className="w-full text-left flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-sm">
+                            <Images className="w-4 h-4 text-green-500" /> Reference Studio
+                        </button>
+                    </div>
+                )}
             </div>
 
             <button 
@@ -969,9 +985,16 @@ const App: React.FC = () => {
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* --------------------------------------------------------------------------------
-           MODE: CHARACTER EMOTION STUDIO
+           MODE: REFERENCE STUDIO
            -------------------------------------------------------------------------------- */}
-        {appMode === 'character-studio' ? (
+        {appMode === 'reference-studio' ? (
+           <div className="w-full h-full overflow-y-auto">
+              <ReferenceStudio />
+           </div>
+        ) : appMode === 'character-studio' ? (
+          /* --------------------------------------------------------------------------------
+             MODE: CHARACTER EMOTION STUDIO
+             -------------------------------------------------------------------------------- */
            <div className="w-full h-full overflow-y-auto">
               <CharacterEmotionStudio />
            </div>
@@ -1060,6 +1083,18 @@ const App: React.FC = () => {
                                        <span className="relative z-10 text-sm font-bold">Webtoon (Color)</span>
                                        <div className="relative z-10 text-xs opacity-80">Full Color Digital Art</div>
                                    </button>
+                               </div>
+                               <div className="mt-2">
+                                   <input
+                                       type="text"
+                                       value={customStyle}
+                                       onChange={(e) => {
+                                           setCustomStyle(e.target.value);
+                                           setStyleMode('custom');
+                                       }}
+                                       placeholder="Or enter a custom style..."
+                                       className={`w-full bg-slate-50 dark:bg-slate-800 border-2 rounded-lg px-3 py-2 text-sm transition-all ${styleMode === 'custom' ? 'border-purple-500 ring-2 ring-purple-500/50' : 'border-slate-200 dark:border-slate-700'}`}
+                                   />
                                </div>
                            </div>
 

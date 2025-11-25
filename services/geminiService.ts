@@ -56,6 +56,7 @@ export const generateStoryboard = async (
   characters: Character[],
   coverAspectRatio: 'landscape' | 'portrait',
   styleMode: StyleMode,
+  customStyle: string,
   renderMode: RenderMode = 'overlay',
   panelCount: number | 'unlimited' = 8
 ): Promise<Storyboard> => {
@@ -67,7 +68,9 @@ export const generateStoryboard = async (
 
   const styleInstruction = styleMode === 'bw' 
     ? "Japanese Manga Style (Black and White, Screen Tones, High Contrast)" 
-    : "Korean Webtoon Style (Full Color, Vibrant, Digital Art, Clean Lines)";
+    : styleMode === 'color'
+    ? "Korean Webtoon Style (Full Color, Vibrant, Digital Art, Clean Lines)"
+    : customStyle;
 
   const panelCountInstruction = panelCount === 'unlimited'
     ? "스토리를 아주 상세하게 표현하여 **최소 31컷 이상**으로 구성하세요. 컷 수에 상한선은 없습니다."
@@ -190,6 +193,53 @@ export const generateStoryboard = async (
 
   } catch (error) {
     console.error("Storyboard generation failed:", error);
+    throw error;
+  }
+};
+
+export const generateReferenceImage = async (
+  prompt: string,
+  imageData: string | null,
+  aspectRatio: '1:1' | '16:9' | '3:4',
+  resolution: '1K' | '2K' | '4K'
+): Promise<string> => {
+  const ai = getAiClient();
+  const parts: any[] = [];
+
+  if (imageData) {
+    const [header, data] = imageData.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] || "image/jpeg";
+    parts.push({ inlineData: { mimeType, data } });
+    parts.push({ text: "Use the uploaded image as a primary reference for style and content." });
+  }
+
+  const mainPrompt = `
+    Generate a high-quality reference image based on the following prompt.
+    Style: Digital Painting, Concept Art, High Detail.
+    Prompt: ${prompt}
+  `;
+  parts.push({ text: mainPrompt });
+
+  try {
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: IMAGE_MODEL,
+      contents: { parts },
+      config: {
+        imageConfig: {
+          aspectRatio: aspectRatio,
+          imageSize: resolution,
+        }
+      }
+    }));
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    throw new Error("No image data found in response");
+  } catch (error) {
+    console.error("Reference image generation failed:", error);
     throw error;
   }
 };
@@ -344,7 +394,8 @@ export const generateCoverImage = async (
   prompt: string,
   characters: Character[],
   aspectRatio: 'landscape' | 'portrait',
-  styleMode: StyleMode
+  styleMode: StyleMode,
+  customStyle: string
 ): Promise<string> => {
   const ai = getAiClient();
   const parts: any[] = [];
@@ -361,7 +412,9 @@ export const generateCoverImage = async (
 
   const stylePrompt = styleMode === 'bw'
       ? "Style: Masterpiece Japanese Manga Cover Art (Black and White). Technique: Incredible detail, Dynamic composition, Dramatic Lighting, Ink textures, Screen tones."
-      : "Style: Masterpiece Korean Webtoon Cover Art (Full Color). Technique: Incredible detail, Dynamic composition, Cinematic Lighting, Digital Illustration, Vibrant Colors, High Saturation.";
+      : styleMode === 'color'
+      ? "Style: Masterpiece Korean Webtoon Cover Art (Full Color). Technique: Incredible detail, Dynamic composition, Cinematic Lighting, Digital Illustration, Vibrant Colors, High Saturation."
+      : `Style: ${customStyle}. Technique: Incredible detail, Dynamic composition, Cinematic Lighting.`;
 
   const mainPrompt = `
     ${stylePrompt}
@@ -403,6 +456,7 @@ export const generatePanelImage = async (
   panel: Panel,
   allCharacters: Character[],
   styleMode: StyleMode,
+  customStyle: string,
   renderMode: RenderMode
 ): Promise<string> => {
   const ai = getAiClient();
@@ -433,7 +487,9 @@ export const generatePanelImage = async (
 
   const stylePrompt = styleMode === 'bw'
       ? "Style: Professional Japanese Manga (Black and White). Technique: Detailed Ink lines, Screen tones (Ben-Day dots), High Contrast."
-      : "Style: Professional Korean Webtoon (Full Color). Technique: Digital Art, Cel Shading, Vibrant Colors, Clean lines.";
+      : styleMode === 'color'
+      ? "Style: Professional Korean Webtoon (Full Color). Technique: Digital Art, Cel Shading, Vibrant Colors, Clean lines."
+      : `Style: ${customStyle}.`;
 
   // Construct Dialogue Text for AI Native Mode
   let dialoguePrompt = "";
