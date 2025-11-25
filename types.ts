@@ -40,7 +40,7 @@ export interface Panel {
   status: 'pending' | 'generating' | 'completed' | 'failed';
 }
 
-export type StyleMode = 'bw' | 'color';
+export type StyleMode = 'bw' | 'color' | 'custom';
 export type RenderMode = 'overlay' | 'native';
 
 export interface Storyboard {
