@@ -74,9 +74,9 @@ export const generateStoryboard = async (
     : `스토리를 정확히 **${panelCount}컷**으로 구성하세요.`;
 
   const prompt = `
-    당신은 세계 최고의 만화 콘티 작가입니다.
+    당신은 천재적인 만화 연출가입니다. 단순한 텍스트 변환이 아닌, 서사를 시각적으로 재창조하는 데 집중하세요.
     
-    임무: 제공된 스토리 로그와 캐릭터를 바탕으로, 작화가(AI)가 완벽한 그림을 그릴 수 있도록 **매우 상세하고 구체적인** 만화 콘티(Name/Storyboard)를 작성하세요.
+    임무: 제공된 스토리를 분석하여, 독자의 몰입을 극대화하는 한 편의 만화 콘티를 연출하세요. 스토리의 핵심 감정과 흐름을 파악하고, 전문적인 연출 기법을 사용하여 컷을 나누고 구성해야 합니다.
     
     [등록된 캐릭터 목록]
     ${characterContext}
@@ -84,6 +84,12 @@ export const generateStoryboard = async (
     [스토리 로그]
     ${storyLog}
     
+    [연출 지침]
+    1.  **서사 분석 및 재구성:** 스토리를 기-승-전-결 구조로 분석하고, 각 단계의 목적에 맞게 컷을 배분하세요. 중요한 감정선이나 사건은 여러 컷에 걸쳐 세밀하게 묘사하고, 불필요한 부분은 과감하게 압축하거나 생략하세요.
+    2.  **완급 조절:** 속도감 있는 액션 장면은 짧고 역동적인 컷을 연속으로 사용하고, 감정을 쌓아야 하는 서정적인 장면은 크고 정적인 컷을 사용하여 독자가 머무를 시간을 주세요.
+    3.  **시각적 임팩트:** 클라이맥스나 중요한 장면에서는 'wide' 또는 'tall' 컷을 활용하여 시각적 충격을 극대화하세요. 평범한 장면은 'square' 컷을 기본으로 사용합니다.
+    4.  **다양한 카메라 워크:** 단순한 정면 샷을 피하고, 'low-angle', 'high-angle', 'dutch-angle', 'close-up', 'extreme close-up' 등 다양한 카메라 앵글을 적극적으로 사용하여 캐릭터의 감정이나 상황의 긴장감을 효과적으로 전달하세요.
+
     [절대 규칙]
     1. **캐릭터 이름 유지:** 캐릭터의 이름은 등록된 목록의 텍스트(한국어/영어 등)를 **글자 그대로(EXACTLY)** 사용해야 합니다.
     2. **배경 필수 (Background Mandatory):** 모든 컷에는 구체적인 배경 묘사가 필수입니다. 절대 "배경 없음"이나 "흰색 배경"을 만들지 마세요. 장소(교실, 거리, 우주선 등)를 반드시 묘사하세요.
@@ -184,122 +190,6 @@ export const generateStoryboard = async (
 
   } catch (error) {
     console.error("Storyboard generation failed:", error);
-    throw error;
-  }
-};
-
-export const generateAutoLayout = async (
-  storyboard: Storyboard,
-  characters: Character[]
-): Promise<{ coverLayout?: any; panelLayouts: any[]; mangaTools: any[] }> => {
-  const ai = getAiClient();
-
-  // Simplified storyboard for the prompt to reduce token count
-  const promptStoryboard = {
-    title: storyboard.title,
-    panels: storyboard.panels.map(p => ({
-      id: p.id,
-      description: p.description,
-      dialogues: p.dialogues,
-      charactersInPanel: p.charactersInPanel,
-      panelSize: p.panelSize // important for judging importance
-    }))
-  };
-
-  const prompt = `
-    You are a world-class manga artist and layout designer. Your task is to take a storyboard script and create a dynamic, professional, and visually appealing multi-panel layout for a single canvas.
-
-    [Canvas Rules]
-    - The available canvas width for panel placement is exactly 672px.
-    - There should be a gap of 24px between panels and from the canvas edges.
-    - The total height is flexible, but should be compact.
-    - The coordinate system starts with (0,0) at the top-left corner.
-    - All x, y, width, height values must be numbers.
-
-    [Task]
-    1.  Analyze the provided storyboard, paying attention to the story flow, dialogue, and emotional impact of each panel.
-    2.  Design a layout for all panels (and the cover, if it exists). Important panels can be larger. Less important panels can be smaller. Create an interesting, non-grid-like, professional manga page flow.
-    3.  If panels have dialogues, add corresponding 'bubble' tools. Place them near the speaking character.
-    4.  Return a single JSON object with the precise layout and tool information.
-
-    [Storyboard Script]
-    ${JSON.stringify(promptStoryboard, null, 2)}
-
-    [Output Schema]
-    You must return a valid JSON object with the following structure:
-    {
-      "coverLayout": { "x": number, "y": number, "width": number, "height": number, "zIndex": number } | null,
-      "panelLayouts": [ { "id": number, "x": number, "y": number, "width": number, "height": number, "zIndex": number } ],
-      "mangaTools": [ { "type": "bubble" | "text", "x": number, "y": number, "width": number, "height": number, "content": string, "rotation": number } ]
-    }
-  `;
-
-  try {
-    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: STORY_MODEL,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            coverLayout: {
-              type: Type.OBJECT,
-              nullable: true,
-              properties: {
-                x: { type: Type.NUMBER },
-                y: { type: Type.NUMBER },
-                width: { type: Type.NUMBER },
-                height: { type: Type.NUMBER },
-                zIndex: { type: Type.INTEGER },
-              },
-              required: ["x", "y", "width", "height", "zIndex"]
-            },
-            panelLayouts: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  id: { type: Type.INTEGER },
-                  x: { type: Type.NUMBER },
-                  y: { type: Type.NUMBER },
-                  width: { type: Type.NUMBER },
-                  height: { type: Type.NUMBER },
-                  zIndex: { type: Type.INTEGER },
-                },
-                required: ["id", "x", "y", "width", "height", "zIndex"]
-              }
-            },
-            mangaTools: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  type: { type: Type.STRING, enum: ["bubble", "text"] },
-                  x: { type: Type.NUMBER },
-                  y: { type: Type.NUMBER },
-                  width: { type: Type.NUMBER },
-                  height: { type: Type.NUMBER },
-                  content: { type: Type.STRING },
-                  rotation: { type: Type.NUMBER }
-                },
-                required: ["type", "x", "y", "width", "height", "content", "rotation"]
-              }
-            }
-          },
-          required: ["coverLayout", "panelLayouts", "mangaTools"]
-        }
-      }
-    }));
-
-    const text = response.text;
-    if (!text) throw new Error("No response from AI for auto layout.");
-
-    const jsonString = text.replace(/```json\n?|```/g, "");
-    return JSON.parse(jsonString);
-
-  } catch (error) {
-    console.error("AI auto layout generation failed:", error);
     throw error;
   }
 };

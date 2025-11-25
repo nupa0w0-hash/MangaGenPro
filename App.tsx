@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import html2canvas from 'html2canvas';
 import { Character, Storyboard, Panel, PageTemplate, Dialogue, StyleMode, Bookmark, RenderMode, LayoutState } from './types';
-import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript, regenerateCoverPrompt, generateAutoLayout } from './services/geminiService';
+import { generateStoryboard, generatePanelImage, generateCoverImage, regeneratePanelScript, regenerateCoverPrompt } from './services/geminiService';
 import CharacterManager from './components/CharacterManager';
 import ComicPanel from './components/ComicPanel';
 import CharacterEmotionStudio from './components/emotion-studio/CharacterEmotionStudio';
@@ -78,7 +78,6 @@ const App: React.FC = () => {
   const [showBorders, setShowBorders] = useState(true);
   const [isToolboxOpen, setIsToolboxOpen] = useState(false);
   const [showLayoutControls, setShowLayoutControls] = useState(true);
-  const [isGeneratingLayout, setIsGeneratingLayout] = useState(false);
 
   // Initialize Theme & Check API Key
   useEffect(() => {
@@ -363,43 +362,6 @@ const App: React.FC = () => {
 
       setStoryboard({ ...storyboard, panels: newPanels, coverLayout: newCoverLayout });
       setContainerHeight(calculateMaxHeight(newPanels, newCoverLayout));
-  };
-
-  const handleAutoLayout = async () => {
-    if (!storyboard) return;
-
-    setIsGeneratingLayout(true);
-    try {
-      const result = await generateAutoLayout(storyboard, characters);
-
-      // Apply the new layouts
-      const newPanels = storyboard.panels.map(p => {
-        const newLayout = result.panelLayouts.find(l => l.id === p.id);
-        return newLayout ? { ...p, layout: newLayout } : p;
-      });
-
-      // Add new tools, ensuring unique IDs
-      const newMangaTools = result.mangaTools.map(tool => ({
-        ...tool,
-        id: Date.now() + Math.random(), // Simple unique ID
-      }));
-      setAddedTools(prev => [...prev, ...newMangaTools]);
-
-      setStoryboard(prev => prev ? { ...prev, panels: newPanels, coverLayout: result.coverLayout || prev.coverLayout } : null);
-
-      // Recalculate container height based on new layout
-      if (storyboard) {
-        const maxPanelHeight = Math.max(...newPanels.map(p => (p.layout?.y || 0) + (p.layout?.height || 0)));
-        const coverHeight = (result.coverLayout?.y || 0) + (result.coverLayout?.height || 0);
-        setContainerHeight(Math.max(1200, maxPanelHeight, coverHeight) + 200);
-      }
-
-    } catch (error) {
-      console.error("Failed to generate AI layout:", error);
-      alert("AI 레이아웃 생성에 실패했습니다. 다시 시도해주세요.");
-    } finally {
-      setIsGeneratingLayout(false);
-    }
   };
 
   // ... (rest of functions)
@@ -1471,20 +1433,6 @@ const App: React.FC = () => {
                                 title="Reset Layout Positions"
                             >
                                 <RefreshCcw className="w-3.5 h-3.5" /> Reset
-                            </button>
-
-                            <button
-                                onClick={handleAutoLayout}
-                                disabled={isGeneratingLayout}
-                                className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors disabled:bg-indigo-400 disabled:cursor-not-allowed"
-                                title="AI Auto Layout"
-                            >
-                                {isGeneratingLayout ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                )}
-                                AI Layout
                             </button>
 
                             {/* Tool Controls (Collapsible) */}
