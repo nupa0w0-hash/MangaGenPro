@@ -803,8 +803,15 @@ const App: React.FC = () => {
   const bringToFront = (index: number) => {
       if (!storyboard) return;
       const newPanels = [...storyboard.panels];
-      // Find max zIndex
-      const maxZ = Math.max(...newPanels.map(p => p.layout?.zIndex || 0), 0);
+      const currentZ = newPanels[index].layout?.zIndex || 0;
+
+      // Find max zIndex among OTHER panels
+      const otherPanels = newPanels.filter((_, i) => i !== index);
+      const maxZ = Math.max(...otherPanels.map(p => p.layout?.zIndex || 0), 0);
+
+      // If current is already higher than all others, do nothing
+      if (currentZ > maxZ) return;
+
       if (newPanels[index].layout) {
           newPanels[index].layout = { ...newPanels[index].layout!, zIndex: maxZ + 1 };
           setStoryboard({ ...storyboard, panels: newPanels });
@@ -1707,7 +1714,7 @@ const App: React.FC = () => {
                                             {/* Size Presets (Floating) - Toggleable on click */}
                                             <div className="absolute top-2 left-2 z-50 flex gap-1 no-drag" data-html2canvas-ignore="true">
                                                 {activeSettingsPanel === idx ? (
-                                                    <div className="bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag">
+                                                    <div className={`bg-white/90 backdrop-blur rounded-lg shadow-lg border border-slate-200 p-1 flex gap-1 animate-fade-in no-drag transition-opacity ${selectedPanelId === panel.id ? 'opacity-100' : 'opacity-0 md:group-hover/panel-container:opacity-100'}`}>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); updatePanelLayout(idx, { width: 300, height: 300 }); setActiveSettingsPanel(null); }}
                                                             className="p-2 md:p-1 rounded hover:bg-slate-100 text-slate-500 no-drag"
@@ -1740,7 +1747,7 @@ const App: React.FC = () => {
                                                 ) : (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); setActiveSettingsPanel(idx); }}
-                                                        className="bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors opacity-100 md:opacity-0 md:group-hover/panel-container:opacity-100 no-drag"
+                                                            className={`bg-white/90 backdrop-blur text-slate-500 p-2 rounded-lg shadow-md border border-slate-200 hover:text-indigo-600 transition-colors no-drag ${selectedPanelId === panel.id ? 'opacity-100' : 'opacity-0 md:group-hover/panel-container:opacity-100'}`}
                                                         aria-label="Open layout settings"
                                                     >
                                                        <Settings2 className="w-4 h-4" />
