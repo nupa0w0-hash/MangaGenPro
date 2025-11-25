@@ -77,49 +77,52 @@ export const generateStoryboard = async (
     : `스토리를 정확히 **${panelCount}컷**으로 구성하세요.`;
 
   const prompt = `
-    당신은 천재적인 만화 연출가입니다. 단순한 텍스트 변환이 아닌, 서사를 시각적으로 재창조하는 데 집중하세요.
-    
-    임무: 제공된 스토리를 분석하여, 독자의 몰입을 극대화하는 한 편의 만화 콘티를 연출하세요. 스토리의 핵심 감정과 흐름을 파악하고, 전문적인 연출 기법을 사용하여 컷을 나누고 구성해야 합니다.
-    
-    [등록된 캐릭터 목록]
+    You are a genius comic director. Your task is to adapt the provided story into a visually compelling manga storyboard, focusing on professional manga techniques for narrative pacing, emotional emphasis, and cinematic camera work.
+
+    [Character List]
     ${characterContext}
     
-    [스토리 로그]
+    [Story Log]
     ${storyLog}
     
-    [연출 지침]
-    1.  **서사 분석 및 재구성:** 스토리를 기-승-전-결 구조로 분석하고, 각 단계의 목적에 맞게 컷을 배분하세요. 중요한 감정선이나 사건은 여러 컷에 걸쳐 세밀하게 묘사하고, 불필요한 부분은 과감하게 압축하거나 생략하세요.
-    2.  **완급 조절:** 속도감 있는 액션 장면은 짧고 역동적인 컷을 연속으로 사용하고, 감정을 쌓아야 하는 서정적인 장면은 크고 정적인 컷을 사용하여 독자가 머무를 시간을 주세요.
-    3.  **시각적 임팩트:** 클라이맥스나 중요한 장면에서는 'wide' 또는 'tall' 컷을 활용하여 시각적 충격을 극대화하세요. 평범한 장면은 'square' 컷을 기본으로 사용합니다.
-    4.  **다양한 카메라 워크:** 단순한 정면 샷을 피하고, 'low-angle', 'high-angle', 'dutch-angle', 'close-up', 'extreme close-up' 등 다양한 카메라 앵글을 적극적으로 사용하여 캐릭터의 감정이나 상황의 긴장감을 효과적으로 전달하세요.
+    [Directing Guidelines]
+    1.  **Narrative Pacing & Flow:** Analyze the story's rising action, climax, and resolution. Allocate panels to build tension, linger on emotional moments, and deliver impactful revelations. Ensure a smooth, logical flow from one panel to the next, avoiding abrupt jumps.
+    2.  **Emotional Emphasis:** Use panel size and camera angles to amplify the characters' emotions. For instance, use a large, tall panel with a low-angle shot for a triumphant moment, or a series of small, tight close-ups for a rapidly escalating argument.
+    3.  **Cinematic Camera Work:** Employ a variety of camera angles to create a dynamic and immersive experience. Do not just use straight-on shots.
+        *   **Establishing Shots (Wide Angle):** Introduce new locations or show the scale of an event.
+        *   **Medium Shots:** For neutral dialogue and standard interaction.
+        *   **Close-ups / Extreme Close-ups:** To focus on a character's facial expression, a key object, or a subtle action.
+        *   **High-angle / Low-angle Shots:** To convey power dynamics (e.g., low-angle makes a character look powerful, high-angle makes them look vulnerable).
+        *   **Point-of-View (POV) Shots:** To show the scene from a character's perspective.
+        *   **Dutch Angles:** To create a sense of unease or disorientation.
 
-    [절대 규칙]
-    1. **캐릭터 이름 유지:** 캐릭터의 이름은 등록된 목록의 텍스트(한국어/영어 등)를 **글자 그대로(EXACTLY)** 사용해야 합니다.
-    2. **배경 필수 (Background Mandatory):** 모든 컷에는 구체적인 배경 묘사가 필수입니다. 절대 "배경 없음"이나 "흰색 배경"을 만들지 마세요. 장소(교실, 거리, 우주선 등)를 반드시 묘사하세요.
-    3. **의상 및 헤어스타일 엄격 유지:**
-       - 스토리 로그에 의상이나 헤어스타일 변경에 대한 명확한 언급(예: "코트를 입는다", "머리를 묶는다")이 **없다면**, 절대 임의로 의상이나 헤어스타일을 묘사하지 마세요.
-       - 의상/헤어 변경이 없는 경우 \`costumeOverride\` 필드를 반드시 비워두세요(null/empty).
-    
-    [지시사항]
-    1. ${panelCountInstruction}
-    2. **${styleInstruction}**의 연출을 사용하세요.
-    3. **Visual Prompt Detail:** visualPromptEn은 AI가 이미지를 생성하는 정보입니다.
-       - **주의:** 의상이나 헤어스타일 묘사는 \`costumeOverride\` 필드에만 작성하고, \`visualPromptEn\`에는 구도, 조명, 표정, 배경, 액션 위주로 작성하세요.
-    4. 표지(Cover) 프롬프트 작성: 제목과 어울리는 임팩트 있는 표지 일러스트 프롬프트를 작성하세요.
-    
-    각 패널 출력 항목:
-       - description: (한국어) 현재 상황 설명.
-       - location: (영어) 장소 (예: Classroom, Street).
-       - time: (영어) 시간대 (예: Night, Sunset).
-       - costumeOverride: (영어) **스토리 로그에 명시된 경우에만** 작성. 없으면 빈 문자열.
-       - visualPromptEn: (영어) 이미지 생성 AI를 위한 묘사 (액션, 구도, 표정 등). 의상 묘사 제외.
-         * 필수: 구체적 배경 (Background), 조명 (Lighting), 카메라 앵글 (Low angle, Fish-eye, Close-up).
-         * 스타일: "${styleInstruction}".
-       - dialogues: (Array) 대사 목록.
-       - panelSize: 'square', 'wide', 'tall'.
-       - charactersInPanel: 해당 컷에 등장하는 캐릭터 이름 배열.
-    
-    출력 형식: JSON.
+    [Absolute Rules]
+    1.  **Maintain Character Names:** Character names must be used EXACTLY as they appear in the Character List.
+    2.  **Backgrounds by Default:** Every panel should generally have a detailed background to establish the setting. However, for dramatic emphasis on a character's emotion or a specific action, you can intentionally use a simple, solid color, an abstract background, or even leave it blank. Use this technique sparingly and purposefully.
+    3.  **Strict Costume & Hairstyle Adherence:**
+        *   Do not describe any costume or hairstyle changes unless EXPLICITLY mentioned in the Story Log (e.g., "puts on a coat," "ties up hair").
+        *   If there are no costume/hair changes, the \`costumeOverride\` field must be left empty (null/empty).
+
+    [Instructions]
+    1.  ${panelCountInstruction}
+    2.  Use the following art style: **${styleInstruction}**.
+    3.  **Visual Prompt Detail:** The 'visualPromptEn' is the information the AI will use to generate the image.
+        *   **Important:** Describe costumes or hairstyles ONLY in the \`costumeOverride\` field. 'visualPromptEn' should focus on composition, lighting, facial expressions, background, and action.
+    4.  **Cover Prompt:** Write an impactful cover illustration prompt that matches the title.
+
+    [Output Schema for Each Panel]
+       - description: (Korean) Description of the current situation.
+       - location: (English) The place (e.g., Classroom, Street).
+       - time: (English) The time of day (e.g., Night, Sunset).
+       - costumeOverride: (English) ONLY fill this if explicitly mentioned in the story log. Otherwise, empty string.
+       - visualPromptEn: (English) Description for the image generation AI (action, composition, expression, etc.), excluding costume details.
+         * Required: Specific Background, Lighting, Camera Angle (e.g., Low angle, Fish-eye, Close-up).
+         * Style: "${styleInstruction}".
+       - dialogues: (Array) List of dialogues.
+       - panelSize: 'square', 'wide', or 'tall'.
+       - charactersInPanel: Array of character names appearing in the panel.
+
+    Output Format: JSON.
   `;
 
   try {
