@@ -188,6 +188,122 @@ export const generateStoryboard = async (
   }
 };
 
+export const generateAutoLayout = async (
+  storyboard: Storyboard,
+  characters: Character[]
+): Promise<{ coverLayout?: any; panelLayouts: any[]; mangaTools: any[] }> => {
+  const ai = getAiClient();
+
+  // Simplified storyboard for the prompt to reduce token count
+  const promptStoryboard = {
+    title: storyboard.title,
+    panels: storyboard.panels.map(p => ({
+      id: p.id,
+      description: p.description,
+      dialogues: p.dialogues,
+      charactersInPanel: p.charactersInPanel,
+      panelSize: p.panelSize // important for judging importance
+    }))
+  };
+
+  const prompt = `
+    You are a world-class manga artist and layout designer. Your task is to take a storyboard script and create a dynamic, professional, and visually appealing multi-panel layout for a single canvas.
+
+    [Canvas Rules]
+    - The available canvas width for panel placement is exactly 672px.
+    - There should be a gap of 24px between panels and from the canvas edges.
+    - The total height is flexible, but should be compact.
+    - The coordinate system starts with (0,0) at the top-left corner.
+    - All x, y, width, height values must be numbers.
+
+    [Task]
+    1.  Analyze the provided storyboard, paying attention to the story flow, dialogue, and emotional impact of each panel.
+    2.  Design a layout for all panels (and the cover, if it exists). Important panels can be larger. Less important panels can be smaller. Create an interesting, non-grid-like, professional manga page flow.
+    3.  If panels have dialogues, add corresponding 'bubble' tools. Place them near the speaking character.
+    4.  Return a single JSON object with the precise layout and tool information.
+
+    [Storyboard Script]
+    ${JSON.stringify(promptStoryboard, null, 2)}
+
+    [Output Schema]
+    You must return a valid JSON object with the following structure:
+    {
+      "coverLayout": { "x": number, "y": number, "width": number, "height": number, "zIndex": number } | null,
+      "panelLayouts": [ { "id": number, "x": number, "y": number, "width": number, "height": number, "zIndex": number } ],
+      "mangaTools": [ { "type": "bubble" | "text", "x": number, "y": number, "width": number, "height": number, "content": string, "rotation": number } ]
+    }
+  `;
+
+  try {
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: STORY_MODEL,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            coverLayout: {
+              type: Type.OBJECT,
+              nullable: true,
+              properties: {
+                x: { type: Type.NUMBER },
+                y: { type: Type.NUMBER },
+                width: { type: Type.NUMBER },
+                height: { type: Type.NUMBER },
+                zIndex: { type: Type.INTEGER },
+              },
+              required: ["x", "y", "width", "height", "zIndex"]
+            },
+            panelLayouts: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.INTEGER },
+                  x: { type: Type.NUMBER },
+                  y: { type: Type.NUMBER },
+                  width: { type: Type.NUMBER },
+                  height: { type: Type.NUMBER },
+                  zIndex: { type: Type.INTEGER },
+                },
+                required: ["id", "x", "y", "width", "height", "zIndex"]
+              }
+            },
+            mangaTools: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING, enum: ["bubble", "text"] },
+                  x: { type: Type.NUMBER },
+                  y: { type: Type.NUMBER },
+                  width: { type: Type.NUMBER },
+                  height: { type: Type.NUMBER },
+                  content: { type: Type.STRING },
+                  rotation: { type: Type.NUMBER }
+                },
+                required: ["type", "x", "y", "width", "height", "content", "rotation"]
+              }
+            }
+          },
+          required: ["coverLayout", "panelLayouts", "mangaTools"]
+        }
+      }
+    }));
+
+    const text = response.text;
+    if (!text) throw new Error("No response from AI for auto layout.");
+
+    const jsonString = text.replace(/```json\n?|```/g, "");
+    return JSON.parse(jsonString);
+
+  } catch (error) {
+    console.error("AI auto layout generation failed:", error);
+    throw error;
+  }
+};
+
 // New Function: Regenerate cover prompt
 export const regenerateCoverPrompt = async (
   storyLog: string,
